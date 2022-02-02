@@ -142,7 +142,26 @@ class CW1
     task3(std_msgs::Float32 r, std_msgs::Float32 g, std_msgs::Float32 b,
       eometry_msgs::PoseStamped goal_loc);
 
-    
+    bool 
+    moveArm(geometry_msgs::Pose target_pose);
+
+    /** \brief MoveIt function for moving the gripper fingers to a new position. 
+      *
+      * \input[in] width desired gripper finger width
+      *
+      * \return true if gripper fingers are moved to the new position
+      */
+    bool 
+    moveGripper(float width);
+
+    /** \brief MoveIt function for adding a cuboid collision object in RViz
+      * and the MoveIt planning scene.
+      *
+      * \input[in] object_name name for the new object to be added
+      * \input[in] centre point at which to add the new object
+      * \input[in] dimensions dimensions of the cuboid to add in x,y,z
+      * \input[in] orientation rotation to apply to the cuboid before adding
+      */
 
 
   /* Variables */
