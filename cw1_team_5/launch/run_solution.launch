@@ -13,6 +13,9 @@
 
 <!-- add your own nodes to launch below here -->
 
-<!-- <node name="..." pkg="cw1_team_5" type="cw1_node"/> -->
+<node pkg="cw1_team_5" 
+      name="cw1_team_5_node" 
+      type="cw1_team_5_node" 
+      output="screen"/>
 
 </launch>
