@@ -129,6 +129,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -166,6 +167,9 @@ add_dependencies(${PROJECT_NAME}_node
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${PCL_FILTERS_LIBRARIES}
+  ${PCL_IO_LIBRARIES}
   CW1_lib
 )
 
@@ -196,6 +200,11 @@ target_link_libraries(${PROJECT_NAME}_node
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
 # )
+install(TARGETS ${PROJECT_NAME}_node 
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/

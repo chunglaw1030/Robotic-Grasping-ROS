@@ -36,9 +36,14 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointC;
 typedef PointC::Ptr PointCPtr;
+
+typedef pcl::PointXYZRGBA PointD;
+typedef pcl::PointCloud<PointD> PointE;
+typedef PointE::Ptr PointEPtr;
 
 CW1::CW1(ros::NodeHandle &nh):
   g_cloud_ptr (new PointC), // input point cloud
@@ -53,7 +58,12 @@ CW1::CW1(ros::NodeHandle &nh):
   g_inliers_cylinder (new pcl::PointIndices), // cylidenr seg
   g_coeff_plane (new pcl::ModelCoefficients), // plane coeff
   g_coeff_cylinder (new pcl::ModelCoefficients), // cylinder coeff
-  debug_ (false)
+  debug_ (false),
+
+  // g_rgb_cloud (new pcl::PointCloud<pcl::PointXYZRGB>),
+  // g_cloud_filtered_rgb (new pcl::PointCloud<pcl::PointXYZRGB>)
+  g_rgb_cloud (new PointE),
+  g_cloud_filtered_rgb (new PointE)
 {
   /* Constructor function, this is run only when an object of the class is first
   created. The aim of this function is to initialise the class */
@@ -89,6 +99,9 @@ CW1::CW1(ros::NodeHandle &nh):
   g_pt_thrs_min = 0.0; // PassThrough min thres: Better in a config file
   g_pt_thrs_max = 0.7; // PassThrough max thres: Better in a config file
   g_k_nn = 50; // Normals nn size: Better in a config file
+  // g_r.data = 50.0f;
+  // g_g.data = 50.0f;
+  // g_b.data = 50.0f;
 
 }
 
@@ -127,20 +140,37 @@ CW1::task2Callback(cw1_world_spawner::Task2Service::Request &request,
 
 {
   /* Object detection and localization */
+  g_r.data = request.r.data * 100;
+  g_g.data = request.g.data * 100;
+  g_b.data = request.b.data * 100;
 
-  std_msgs::Float32 r;
-  std_msgs::Float32 g;
-  std_msgs::Float32 b;
-  r = request.r;
-  g = request.g;
-  b = request.b;
+  // ros::AsyncSpinner spinner(1);
+  // spinner.start();
+
+  // ros::Subscriber sub_rgb =
+  // nh_.subscribe ("/r200/camera/depth_registered/points",
+  //               1,
+  //               &CW1::findCentroid,
+  //               this);
+
+  ROS_INFO("RGB values: %g %g %g", 
+    g_r.data, g_g.data, g_b.data);
+
+
+  // ros::Subscriber sub_rgb =
+  // nh_.subscribe ("/r200/camera/depth_registered/points",
+  //               1,
+  //               findCentroid(sensor_msgs::PointCloud2ConstPtr &cloud_input_msg));
 
   // ros::Subscriber sub_rgb =
   // nh_.subscribe ("/r200/camera/depth_registered/points",
   //               1,
   //               findCentroid);
+  // pubFilteredRGB (g_pub_cloud, *g_cloud_filtered_rgb);
+  // ros::MultiThreadedSpinner spinner(1); // Use 4 threads
+  // spinner.spin(); 
 
-  return 0;
+  return free;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -429,24 +459,107 @@ CW1::findCentroid(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   g_input_pc_frame_id_ = cloud_input_msg->header.frame_id;
     
   // Convert to PCL data type
-  pcl_conversions::toPCL (*cloud_input_msg, g_pcl_pc);
-  pcl::fromPCLPointCloud2 (g_pcl_pc, *g_cloud_ptr);
+  // pcl_conversions::toPCL (*cloud_input_msg, g_pcl_pc);
+  // pcl::fromPCLPointCloud2 (g_pcl_pc, *g_cloud_ptr);
 
   // Perform the filtering
-  applyVX (g_cloud_ptr, g_cloud_filtered);
-  //applyPT (g_cloud_ptr, g_cloud_filtered);
+  // applyVX (g_cloud_ptr, g_cloud_filtered);
+  // applyPT (g_cloud_ptr, g_cloud_filtered);
   
   // Segment plane and cylinder
-  findNormals (g_cloud_filtered);
-  segPlane (g_cloud_filtered);
-  segCylind (g_cloud_filtered);
-  findCylPose (g_cloud_cylinder);
+  // findNormals (g_cloud_filtered);
+  // segPlane (g_cloud_filtered);
+  // segCube (g_cloud_filtered);
+  // segCylind (g_cloud_filtered);
+  // findCylPose (g_cloud_cylinder);
     
   // Publish the data
   //ROS_INFO ("Publishing Filtered Cloud 2");
   // pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered);
-  pubFilteredPCMsg (g_pub_cloud, *g_cloud_cylinder);
+  // pubFilteredPCMsg (g_pub_cloud, *g_cloud_cylinder);
   
+
+  // pcl::fromROSMsg(*cloud_input_msg, *g_rgb_cloud);
+  // pcl::PCLPointCloud2 cloud_filtered_ros;
+  pcl_conversions::toPCL (*cloud_input_msg, g_pcl_pc);
+  pcl::fromPCLPointCloud2 (g_pcl_pc, *g_rgb_cloud);
+  applyVX (g_rgb_cloud, g_rgb_cloud);
+  findNormals (g_rgb_cloud);
+  segPlane (g_rgb_cloud);
+  pcl::ConditionalRemoval<pcl::PointXYZRGBA> color_filter;
+
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      red_condition(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("r", pcl::ComparisonOps::GT, g_r.data));
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      green_condition(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("g", pcl::ComparisonOps::GT, g_g.data));
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      blue_condition(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("b", pcl::ComparisonOps::GT, g_b.data));
+
+  pcl::ConditionAnd<pcl::PointXYZRGBA>::Ptr color_cond (new pcl::ConditionAnd<pcl::PointXYZRGBA> ());
+  color_cond->addComparison (red_condition);
+  color_cond->addComparison (green_condition);
+  color_cond->addComparison (blue_condition);
+  // Build the filter
+  color_filter.setInputCloud(g_rgb_cloud);
+  color_filter.setCondition (color_cond);
+  color_filter.filter(*g_cloud_filtered_rgb);
+
+  ROS_INFO("Filtered RGB values: %g %g %g", 
+    g_r.data, g_g.data, g_b.data);
+
+  if (g_r.data ==10 && g_g.data == 10 && g_b.data == 80) {
+  ROS_INFO("Colour: blue");
+  } 
+  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 80) {
+  ROS_INFO("Colour: Purple");
+  } 
+  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 10) {
+  ROS_INFO("Colour: red");
+  } 
+
+  // Creating the KdTree object for the search method of the extraction
+  pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+  tree->setInputCloud (g_cloud_filtered_rgb);
+  // pcl::PCDWriter writer;
+  std::vector<pcl::PointIndices> cluster_indices;
+  pcl::EuclideanClusterExtraction<PointT> ec;
+  ec.setClusterTolerance (0.02); // 2cm
+  ec.setMinClusterSize (100);
+  ec.setMaxClusterSize (25000);
+  ec.setSearchMethod (tree);
+  ec.setInputCloud (g_cloud_filtered_rgb);
+  ec.extract (cluster_indices);
+
+  int j = 0;
+  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+  {
+    pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>);
+    for (const auto& idx : it->indices)
+      cloud_cluster->push_back ((*g_cloud_filtered_rgb)[idx]); //*
+    cloud_cluster->width = cloud_cluster->size ();
+    cloud_cluster->height = 1;
+    cloud_cluster->is_dense = true;
+
+    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->size () << " data points." << std::endl;
+    std::stringstream ss;
+    ss << "cloud_cluster_" << j << ".pcd";
+    // writer.write<PointT> (ss.str (), *cloud_cluster, false); //*
+    j++;
+
+  }  
+
+  pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered_rgb); //g_cloud_filtered_rgb
+  findCylPose (g_cloud_filtered_rgb);
+  // Eigen::Vector4f centroid; 
+  // pcl::compute3DCentroid (*g_cloud_filtered_rgb, centroid); 
+  // ROS_INFO("Centroid values: %g %g %g %g", centroid[0], centroid[1], centroid[2]);
+
+  // pcl::PointXYZRGBA centroid;
+  // pcl::computeCentroid(*g_cloud_filtered_rgb, centroid);
+
+  // ROS_INFO("Centroid values: %g", 
+  //   centroid);
+
   return;
 }
 
@@ -500,7 +613,7 @@ CW1::segPlane (PointCPtr &in_cloud_ptr)
   g_seg.setNormalDistanceWeight (0.1); //bad style
   g_seg.setMethodType (pcl::SAC_RANSAC);
   g_seg.setMaxIterations (100); //bad style
-  g_seg.setDistanceThreshold (0.03); //bad style
+  g_seg.setDistanceThreshold (0.001); //bad style 0.03
   g_seg.setInputCloud (in_cloud_ptr);
   g_seg.setInputNormals (g_cloud_normals);
   // Obtain the plane inliers and coefficients
@@ -562,6 +675,45 @@ CW1::segCylind (PointCPtr &in_cloud_ptr)
 
 ////////////////////////////////////////////////////////////////////////////////
 void
+CW1::segCube (PointCPtr &in_cloud_ptr)
+{
+  // Create the segmentation object for the planar model
+  // and set all the params
+  g_seg.setOptimizeCoefficients (true);
+  g_seg.setModelType (pcl::SACMODEL_PARALLEL_LINES);
+  g_seg.setNormalDistanceWeight (0.1); //bad style
+  g_seg.setMethodType (pcl::SAC_RANSAC);
+  g_seg.setMaxIterations (100); //bad style
+  g_seg.setDistanceThreshold (0.03); //bad style
+  g_seg.setInputCloud (in_cloud_ptr);
+  g_seg.setInputNormals (g_cloud_normals);
+  // Obtain the plane inliers and coefficients
+  g_seg.segment (*g_inliers_plane, *g_coeff_plane);
+  
+  // Extract the planar inliers from the input cloud
+  g_extract_pc.setInputCloud (in_cloud_ptr);
+  g_extract_pc.setIndices (g_inliers_plane);
+  g_extract_pc.setNegative (false);
+  
+  // Write the planar inliers to disk
+  g_extract_pc.filter (*g_cloud_plane);
+  
+  // Remove the planar inliers, extract the rest
+  g_extract_pc.setNegative (true);
+  g_extract_pc.filter (*g_cloud_filtered2);
+  g_extract_normals.setNegative (true);
+  g_extract_normals.setInputCloud (g_cloud_normals);
+  g_extract_normals.setIndices (g_inliers_plane);
+  g_extract_normals.filter (*g_cloud_normals2);
+
+  //ROS_INFO_STREAM ("Plane coefficients: " << *g_coeff_plane);
+  ROS_INFO_STREAM ("PointCloud representing the planar component: "
+                   << g_cloud_plane->size ()
+                   << " data points.");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void
 CW1::findCylPose (PointCPtr &in_cloud_ptr)
 {
   Eigen::Vector4f centroid_in;
@@ -598,6 +750,7 @@ CW1::pubFilteredPCMsg (ros::Publisher &pc_pub,
                                PointC &pc)
 {
   // Publish the data
+  
   pcl::toROSMsg(pc, g_cloud_filtered_msg);
   pc_pub.publish (g_cloud_filtered_msg);
   
@@ -614,3 +767,94 @@ CW1::publishPose (geometry_msgs::PointStamped &cyl_pt_msg)
   
   return;
 }
+
+void
+CW1::pubFilteredRGB (ros::Publisher &pc_pub,
+                               PointE &pc)
+{
+  // Publish the data
+  pcl::toROSMsg(pc, g_cloud_filtered_msg);
+  // g_cloud_filtered_msg.header.frame_id = g_input_pc_frame_id_;
+  pc_pub.publish (g_cloud_filtered_msg);
+  
+  return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// void
+// CW1::applyVXRGB (PointEPtr &in_cloud_ptr,
+//                       PointEPtr &out_cloud_ptr)
+// {
+//   g_vx_RGB.setInputCloud (in_cloud_ptr);
+//   g_vx_RGB.setLeafSize (g_vg_leaf_sz, g_vg_leaf_sz, g_vg_leaf_sz);
+//   g_vx_RGB.filter (*out_cloud_ptr);
+  
+//   return;
+// }
+
+
+// ////////////////////////////////////////////////////////////////////////////////
+// void
+// CW1::applyPTRGB (PointEPtr &in_cloud_ptr,
+//                       PointEPtr &out_cloud_ptr)
+// {
+//   g_pt.setInputCloud (in_cloud_ptr);
+//   g_pt.setFilterFieldName ("x");
+//   g_pt.setFilterLimits (g_pt_thrs_min, g_pt_thrs_max);
+//   g_pt.filter (*out_cloud_ptr);
+  
+//   return;
+// }
+
+// ////////////////////////////////////////////////////////////////////////////////
+// void
+// CW1::findNormalsRGB (PointEPtr &in_cloud_ptr)
+// {
+//   // Estimate point normals
+//   g_ne.setInputCloud (in_cloud_ptr);
+//   g_ne.setSearchMethod (g_tree_ptr);
+//   g_ne.setKSearch (g_k_nn);
+//   g_ne.compute (*g_cloud_normals);
+  
+//   return;
+// }
+
+// ////////////////////////////////////////////////////////////////////////////////
+// void
+// CW1::segPlaneRGB (PointEPtr &in_cloud_ptr)
+// {
+//   // Create the segmentation object for the planar model
+//   // and set all the params
+//   g_seg.setOptimizeCoefficients (true);
+//   g_seg.setModelType (pcl::SACMODEL_NORMAL_PLANE);
+//   g_seg.setNormalDistanceWeight (0.1); //bad style
+//   g_seg.setMethodType (pcl::SAC_RANSAC);
+//   g_seg.setMaxIterations (100); //bad style
+//   g_seg.setDistanceThreshold (0.03); //bad style
+//   g_seg.setInputCloud (in_cloud_ptr);
+//   g_seg.setInputNormals (g_cloud_normals);
+//   // Obtain the plane inliers and coefficients
+//   g_seg.segment (*g_inliers_plane, *g_coeff_plane);
+  
+//   // Extract the planar inliers from the input cloud
+//   g_extract_pc.setInputCloud (in_cloud_ptr);
+//   g_extract_pc.setIndices (g_inliers_plane);
+//   g_extract_pc.setNegative (false);
+  
+//   // Write the planar inliers to disk
+//   g_extract_pc.filter (*g_cloud_plane);
+  
+//   // Remove the planar inliers, extract the rest
+//   g_extract_pc.setNegative (true);
+//   g_extract_pc.filter (*g_cloud_filtered2);
+//   g_extract_normals.setNegative (true);
+//   g_extract_normals.setInputCloud (g_cloud_normals);
+//   g_extract_normals.setIndices (g_inliers_plane);
+//   g_extract_normals.filter (*g_cloud_normals2);
+
+//   //ROS_INFO_STREAM ("Plane coefficients: " << *g_coeff_plane);
+//   ROS_INFO_STREAM ("PointCloud representing the planar component: "
+//                    << g_cloud_plane->size ()
+//                    << " data points.");
+// }
+    

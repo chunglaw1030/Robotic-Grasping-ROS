@@ -12,12 +12,6 @@ int main(int argc, char** argv)
 
   // create the service object to handle all callbacks
   CW1 CW1_object(nh);
-
-  // ros::Subscriber sub_rgb =
-  //   nh.subscribe ("/r200/camera/colour/points",
-  //                 1,
-  //                 &PCLTutorial::cloudCallBackOne,
-  //                 &pcl_tutorial);
   
   ros::Subscriber sub_rgb =
   nh.subscribe ("/r200/camera/depth_registered/points",
@@ -26,13 +20,14 @@ int main(int argc, char** argv)
                 &CW1_object);
 
   // loop rate in Hz
-  ros::Rate rate(10);
+  ros::Rate rate(30);
 
   while (ros::ok()) {
 
     // spin and process all pending callbacks
     ros::spinOnce();
-
+    // ros::MultiThreadedSpinner spinner(1); // Use 4 threads
+    // spinner.spin(); // spin() will not return until the node has been shutdown
     // sleep to fulfill the loop rate
     rate.sleep();
   }
