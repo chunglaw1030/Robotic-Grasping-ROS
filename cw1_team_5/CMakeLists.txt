@@ -22,7 +22,14 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
 )
-  
+
+## System dependencies are found with CMake's conventions
+find_package(Boost REQUIRED COMPONENTS system)
+find_package(PCL REQUIRED)
+find_package(PkgConfig)
+pkg_check_modules(EIGEN3 eigen3 REQUIRED)
+find_package(tf REQUIRED)
+find_package(tf_conversions REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -171,6 +178,8 @@ target_link_libraries(${PROJECT_NAME}_node
   ${PCL_FILTERS_LIBRARIES}
   ${PCL_IO_LIBRARIES}
   CW1_lib
+  # ${PCL_LIBRARY_DIRS}
+  # ${PCL_COMMON_LIBRARIES}
 )
 
 #############

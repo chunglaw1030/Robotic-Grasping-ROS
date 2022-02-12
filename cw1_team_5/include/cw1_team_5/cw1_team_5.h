@@ -70,7 +70,7 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
-
+#include <pcl/point_types_conversion.h>
 
 // TF specific includes
 #include <tf/transform_broadcaster.h>
@@ -189,38 +189,11 @@ class CW1
     drop(geometry_msgs::Point position);
 
     void
-    findCentroid(const sensor_msgs::PointCloud2ConstPtr& cloud_input_msg);
+    colourFilter(const sensor_msgs::PointCloud2ConstPtr& cloud_input_msg);
 
-    /* Variables */
-
-    /** \brief Define some useful constant values */
-    std::string base_frame_ = "panda_link0";
-    double gripper_open_ = 80e-3;
-    double gripper_closed_ = 0.0;
-
-    /** \brief Parameters to define the pick operation */
-    double z_offset_ = 0.125;
-    double angle_offset_ = 3.14159 / 4.0;
-    double approach_distance_ = 0.125;
-    double approach_box_ = 0.15;
-    double home_pose_ = 0;
-    
-    /** \brief Node handle. */
-    ros::NodeHandle nh_;
-
-    /** \brief  service servers for advertising ROS services  */
-    ros::ServiceServer task1_srv_;
-    ros::ServiceServer task2_srv_;
-    ros::ServiceServer task3_srv_;
-
-    /** \brief MoveIt interface to move groups to seperate the arm and the gripper,
-      * these are defined in urdf. */
-    moveit::planning_interface::MoveGroupInterface arm_group_{"panda_arm"};
-    moveit::planning_interface::MoveGroupInterface hand_group_{"hand"};
-
-    /** \brief MoveIt interface to interact with the moveit planning scene 
-      * (eg collision objects). */
-    moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
+    void
+    addCollisionObject(std::string object_name, geometry_msgs::Point centre, 
+    geometry_msgs::Vector3 dimensions, geometry_msgs::Quaternion orientation);
 
     void
     applyVX (PointCPtr &in_cloud_ptr,
@@ -292,6 +265,8 @@ class CW1
     void
     pubFilteredRGB (ros::Publisher &pc_pub, PointE &pc);
 
+    void
+    euclideanCluster (PointCPtr &in_cloud_ptr);
     // void
     // applyVXRGB (PointEPtr &in_cloud_ptr,
     //                   PointEPtr &out_cloud_ptr);
@@ -306,6 +281,41 @@ class CW1
     // void
     // segPlaneRGB (PointEPtr &in_cloud_ptr);
 
+    /* Variables */
+
+    /** \brief Define some useful constant values */
+    std::string base_frame_ = "panda_link0";
+    double gripper_open_ = 80e-3;
+    double gripper_closed_ = 0.0;
+
+    /** \brief Parameters to define the pick operation */
+    double z_offset_ = 0.1; //0.125
+    double angle_offset_ = 3.14159 / 4.0;
+    double approach_distance_ = 0.125;
+    double approach_box_ = 0.15;
+    double home_pose_ = 0;
+
+    
+
+
+    
+    /** \brief Node handle. */
+    ros::NodeHandle nh_;
+
+    /** \brief  service servers for advertising ROS services  */
+    ros::ServiceServer task1_srv_;
+    ros::ServiceServer task2_srv_;
+    ros::ServiceServer task3_srv_;
+
+    /** \brief MoveIt interface to move groups to seperate the arm and the gripper,
+      * these are defined in urdf. */
+    moveit::planning_interface::MoveGroupInterface arm_group_{"panda_arm"};
+    moveit::planning_interface::MoveGroupInterface hand_group_{"hand"};
+
+    /** \brief MoveIt interface to interact with the moveit planning scene 
+      * (eg collision objects). */
+    moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
+
   public:
     /** \brief Node handle. */
     ros::NodeHandle g_nh;
@@ -315,6 +325,9 @@ class CW1
 
     /** \brief ROS publishers. */
     ros::Publisher g_pub_cloud;
+
+    /** \brief ROS publishers. */
+    ros::Publisher g_pub_cloud_centroid;
     
     /** \brief ROS geometry message point. */
     geometry_msgs::PointStamped g_cyl_pt_msg;
@@ -390,12 +403,19 @@ class CW1
 
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_cloud_filtered_rgb;
 
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr g_cloud_filtered_hsv;
+
     // std_msgs::Float32 g_r = 0.0f;
     // std_msgs::Float32 g_g = 0.0f;
     // std_msgs::Float32 g_b = 0.0f;
     std_msgs::Float32 g_r;
     std_msgs::Float32 g_g;
     std_msgs::Float32 g_b;
+
+    double g_hue;
+
+    std::list<geometry_msgs::PointStamped> centroid_list;
+    // geometry_msgs::PointStamped[] centroids
 
     // /** \brief Voxel Grid filter. */
     // pcl::VoxelGrid<PointD> g_vx;

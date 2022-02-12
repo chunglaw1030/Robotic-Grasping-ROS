@@ -63,7 +63,8 @@ CW1::CW1(ros::NodeHandle &nh):
   // g_rgb_cloud (new pcl::PointCloud<pcl::PointXYZRGB>),
   // g_cloud_filtered_rgb (new pcl::PointCloud<pcl::PointXYZRGB>)
   g_rgb_cloud (new PointE),
-  g_cloud_filtered_rgb (new PointE)
+  g_cloud_filtered_rgb (new PointE),
+  g_cloud_filtered_hsv (new pcl::PointCloud<pcl::PointXYZHSV>)
 {
   /* Constructor function, this is run only when an object of the class is first
   created. The aim of this function is to initialise the class */
@@ -92,7 +93,8 @@ CW1::CW1(ros::NodeHandle &nh):
 
     // Define the publishers
   g_pub_cloud = nh.advertise<sensor_msgs::PointCloud2> ("filtered_cloud", 1, true);
-  g_pub_pose = nh.advertise<geometry_msgs::PointStamped> ("cyld_pt", 1, true);
+  g_pub_cloud_centroid = nh.advertise<sensor_msgs::PointCloud2> ("centroid_cloud", 1, true);
+  g_pub_pose = nh.advertise<geometry_msgs::PointStamped> ("cyld_pt", 5, true);
   
   // Define public variables
   g_vg_leaf_sz = 0.01; // VoxelGrid leaf size: Better in a config file
@@ -144,6 +146,23 @@ CW1::task2Callback(cw1_world_spawner::Task2Service::Request &request,
   g_g.data = request.g.data * 100;
   g_b.data = request.b.data * 100;
 
+  geometry_msgs::Pose task2_pose ;
+  
+  tf2::Quaternion q_x180deg(-1, 0, 0, 0);
+
+  // determine the grasping orientation
+  tf2::Quaternion q_object;
+  q_object.setRPY(0, 0, angle_offset_);
+  tf2::Quaternion q_result = q_x180deg * q_object;
+  geometry_msgs::Quaternion grasp_orientation = tf2::toMsg(q_result);
+  task2_pose.position.x = 0.3;
+  task2_pose.position.y = 0;
+  task2_pose.position.z = 0.74;
+  task2_pose.orientation = grasp_orientation;
+  task2_pose.position.z += z_offset_;
+
+  moveArm(task2_pose);
+
   // ros::AsyncSpinner spinner(1);
   // spinner.start();
 
@@ -156,6 +175,24 @@ CW1::task2Callback(cw1_world_spawner::Task2Service::Request &request,
   ROS_INFO("RGB values: %g %g %g", 
     g_r.data, g_g.data, g_b.data);
 
+  ROS_INFO("Filtered RGB values: %g %g %g", 
+  g_r.data, g_g.data, g_b.data);
+
+  if (g_r.data ==10 && g_g.data == 10 && g_b.data == 80) {
+  ROS_INFO("Colour: blue");
+  // g_hue = 42;
+  // g_hue = 127;
+  } 
+  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 80) {
+  ROS_INFO("Colour: Purple");
+  // g_hue = 84.5;
+  // g_hue = 127;
+  } 
+  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 10) {
+  ROS_INFO("Colour: red");
+  // g_hue = -127;
+  // g_hue = 50;
+  } 
 
   // ros::Subscriber sub_rgb =
   // nh_.subscribe ("/r200/camera/depth_registered/points",
@@ -169,7 +206,107 @@ CW1::task2Callback(cw1_world_spawner::Task2Service::Request &request,
   // pubFilteredRGB (g_pub_cloud, *g_cloud_filtered_rgb);
   // ros::MultiThreadedSpinner spinner(1); // Use 4 threads
   // spinner.spin(); 
+    // Creating the KdTree object for the search method of the extraction
 
+
+  euclideanCluster (g_cloud_filtered_rgb);
+  // start
+  // pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+  // tree->setInputCloud (g_cloud_filtered_rgb);
+  // pcl::PCDWriter writer;
+  // std::vector<pcl::PointIndices> cluster_indices;
+  // pcl::EuclideanClusterExtraction<PointT> ec;
+  // ec.setClusterTolerance (0.05); // 2cm
+  // ec.setMinClusterSize (1);
+  // ec.setMaxClusterSize (25000);
+  // ec.setSearchMethod (tree);
+  // ec.setInputCloud (g_cloud_filtered_rgb);
+  // ec.extract (cluster_indices);
+  
+  // // for (auto i: cluster_indices)
+  // //   std::cout << i << ' ';
+  // // std::cout << "cluster_indices: " << cluster_indices; 
+  
+  // // pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointE);
+  // centroid_list.clear();
+  // int j = 0;
+  // for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+  // {
+  //   pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointE);
+  //   for (const auto& idx : it->indices)
+  //     cloud_cluster->push_back ((*g_cloud_filtered_rgb)[idx]); //*
+  //   cloud_cluster->width = cloud_cluster->size ();
+  //   cloud_cluster->height = 1;
+  //   cloud_cluster->is_dense = true;
+
+  //   std::cout << "PointCloud representing the Cluster: " << cloud_cluster->size () << " data points." << std::endl;
+  //   std::stringstream ss;
+  //   ss << "cloud_cluster_" << j << ".pcd";
+  //   writer.write<PointT> (ss.str (), *cloud_cluster, false); //*
+  //   j++;
+
+  //   geometry_msgs::PointStamped centroids;
+  //   Eigen::Vector4f centroid_in;
+  //   pcl::compute3DCentroid(*cloud_cluster, centroid_in);
+
+  //   centroids.header.frame_id = g_input_pc_frame_id_;
+  //   centroids.header.stamp = ros::Time (0);
+  //   // centroids.point = j;
+  //   centroids.point.x = centroid_in[0];
+  //   centroids.point.y = centroid_in[1];
+  //   centroids.point.z = centroid_in[2];
+  //   // findCylPose ((*cloud_cluster)[j]);
+  //   // pubFilteredPCMsg (g_pub_cloud, *cloud_cluster);
+  //   // findCylPose (cloud_cluster);
+
+  //   // std::list<geometry_msgs::PointStamped> centroid_list;
+  //   // centroid_list.push_back(centroids);
+  //     // Transform the point to new frame
+  //   geometry_msgs::PointStamped g_cyl_pt_msg_out;
+  //   try
+  //   {
+  //     g_listener_.transformPoint ("world",  // bad styling
+  //                                 centroids,
+  //                                 g_cyl_pt_msg_out);
+  //     //ROS_INFO ("trying transform...");
+  //   }
+  //   catch (tf::TransformException& ex)
+  //   {
+  //     ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  //   }
+ 
+  //   centroid_list.push_back(g_cyl_pt_msg_out);
+  //   publishPose (g_cyl_pt_msg_out);
+    
+  // } ; 
+
+  //stop
+
+  // std::cout << "Centroid list: " <<  centroid_list; //centroid_list.size();
+  
+  // std::list<geometry_msgs::PointStamped>::iterator it;
+  // for (it = centroid_list.begin(); it != centroid_list.end(); ++it){
+  //     // std::cout << it->name;
+  //     publishPose (it);
+  // }
+
+  // for (auto i: centroid_list)
+  //   // auto it = yourList.begin();
+  //   // std::advance(it, index);
+  //   std::cout << 'centroid list: ' << i ;
+
+  //   publishPose (centroid_list);
+  //   // publishPose (centroid_list);
+
+  pubFilteredPCMsg (g_pub_cloud_centroid, *g_cloud_filtered_rgb);
+  
+  // response = centroid_list;
+
+  for (auto i: centroid_list)
+  // auto it = yourList.begin();
+  // std::advance(it, index);
+    std::cout << 'centroid list: \n' << i ;
+      
   return free;
 }
 
@@ -179,10 +316,145 @@ bool
 CW1::task3Callback(cw1_world_spawner::Task3Service::Request &request,
   cw1_world_spawner::Task3Service::Response &response)
 {
-  /* pick up blue objects */
+  g_r.data = request.r.data * 100;
+  g_g.data = request.g.data * 100;
+  g_b.data = request.b.data * 100;
+
+  geometry_msgs::Pose task3_pose1 ;
+  geometry_msgs::Pose task3_pose2 ;
+  tf2::Quaternion q_x180deg(-1, 0, 0, 0);
+
+  // determine the grasping orientation
+  tf2::Quaternion q_object;
+  q_object.setRPY(0, 0, angle_offset_);
+  tf2::Quaternion q_result = q_x180deg * q_object;
+  geometry_msgs::Quaternion grasp_orientation = tf2::toMsg(q_result);
+  geometry_msgs::Quaternion box_orientation;
+  box_orientation.x = 0;
+  box_orientation.y = 0;
+  box_orientation.z = 0;
+  box_orientation.w = -1;
+
+  task3_pose1.position.x = 0.3;
+  task3_pose1.position.y = 0;
+  task3_pose1.position.z = 0.74;
+  task3_pose1.orientation = grasp_orientation;
+  task3_pose1.position.z += z_offset_;
+
+  task3_pose2.position.x = -0.3;
+  task3_pose2.position.y = 0;
+  task3_pose2.position.z = 0.74;
+  task3_pose2.orientation = grasp_orientation;
+  task3_pose2.position.z += z_offset_;
+
+  std::string floor = "floor";
+  geometry_msgs::Point floor_centre;
+  geometry_msgs::Vector3 floor_dimensions;
+  floor_centre.x = 0;
+  floor_centre.y = 0;
+  floor_centre.z = 0;
+  floor_dimensions.x = 100;
+  floor_dimensions.y = 100;
+  floor_dimensions.z = 0.05;
+
+  std::string box = "box";
+  geometry_msgs::Point box_centre;
+  geometry_msgs::Vector3 box_dimensions;
+  geometry_msgs::Point goal_location;
+  goal_location = request.goal_loc.point;
+  box_centre.x = goal_location.x ;
+  box_centre.y = goal_location.y ;
+  box_centre.z = goal_location.z - 0.2;
+  box_dimensions.x = 0.2;
+  box_dimensions.y = 0.2;
+  box_dimensions.z = 0.2;
+
+  addCollisionObject(floor, floor_centre, floor_dimensions,
+    grasp_orientation);
+
+  addCollisionObject(box, box_centre, box_dimensions,
+    box_orientation);
+
+  moveArm(task3_pose1);
+
+  // ros::AsyncSpinner spinner(1);
+  // spinner.start();
+
+  // ros::Subscriber sub_rgb =
+  // nh_.subscribe ("/r200/camera/depth_registered/points",
+  //               1,
+  //               &CW1::findCentroid,
+  //               this);
+
+  ROS_INFO("RGB values: %g %g %g", 
+    g_r.data, g_g.data, g_b.data);
+
+  ROS_INFO("Filtered RGB values: %g %g %g", 
+  g_r.data, g_g.data, g_b.data);
+
+  if (g_r.data ==10 && g_g.data == 10 && g_b.data == 80) {
+  ROS_INFO("Colour: blue");
+  // g_hue = 42;
+  // g_hue = 127;
+  } 
+  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 80) {
+  ROS_INFO("Colour: Purple");
+  // g_hue = 84.5;
+  // g_hue = 127;
+  } 
+  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 10) {
+  ROS_INFO("Colour: red");
+  // g_hue = -127;
+  // g_hue = 50;
+  } 
+
+  euclideanCluster (g_cloud_filtered_rgb);
+
+  pubFilteredPCMsg (g_pub_cloud_centroid, *g_cloud_filtered_rgb);
+  
+  // response = centroid_list;
+
+  for (auto i: centroid_list){
+  // auto it = yourList.begin();
+  // std::advance(it, index);
+    std::cout << 'centroid list: \n' << i ;
+
+    geometry_msgs::Point object_location;
+    object_location = i.point;
+    pick(object_location);
+
+    geometry_msgs::Point goal_location;
+    goal_location = request.goal_loc.point;
+    bool success = drop(goal_location);
+    moveArm(task3_pose1);
+    // euclideanCluster (g_cloud_filtered_rgb);
+    }
+    
+  moveArm(task3_pose2);
 
 
-  return 0;
+  euclideanCluster (g_cloud_filtered_rgb);
+
+  // pubFilteredPCMsg (g_pub_cloud_centroid, *g_cloud_filtered_rgb);
+  
+  // response = centroid_list;
+
+  for (auto i: centroid_list){
+  // auto it = yourList.begin();
+  // std::advance(it, index);
+    std::cout << 'centroid list: \n' << i ;
+
+    geometry_msgs::Point object_location;
+    object_location = i.point;
+    pick(object_location);
+
+    bool success = drop(goal_location);
+    moveArm(task3_pose2);
+    // euclideanCluster (g_cloud_filtered_rgb);
+    }
+    
+
+  return free;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -453,7 +725,7 @@ CW1::drop(geometry_msgs::Point position)
 ///////////////////////////////////////////////////////////////////////////////
 
 void
-CW1::findCentroid(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
+CW1::colourFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
 {
   // Extract inout point cloud info
   g_input_pc_frame_id_ = cloud_input_msg->header.frame_id;
@@ -484,72 +756,166 @@ CW1::findCentroid(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   pcl_conversions::toPCL (*cloud_input_msg, g_pcl_pc);
   pcl::fromPCLPointCloud2 (g_pcl_pc, *g_rgb_cloud);
   applyVX (g_rgb_cloud, g_rgb_cloud);
-  findNormals (g_rgb_cloud);
-  segPlane (g_rgb_cloud);
+  // findNormals (g_rgb_cloud);
+  // segPlane (g_rgb_cloud);
+  segCube (g_rgb_cloud);
+
+  // ROS_INFO("Filtered RGB values: %g %g %g", 
+  // g_r.data, g_g.data, g_b.data);
+
+  // if (g_r.data ==10 && g_g.data == 10 && g_b.data == 80) {
+  // ROS_INFO("Colour: blue");
+  // // g_hue = 42;
+  // g_hue = 127;
+  // } 
+  // else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 80) {
+  // ROS_INFO("Colour: Purple");
+  // // g_hue = 84.5;
+  // g_hue = 127;
+  // } 
+  // else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 10) {
+  // ROS_INFO("Colour: red");
+  // // g_hue = -127;
+  // g_hue = 50;
+  // } 
+
+
   pcl::ConditionalRemoval<pcl::PointXYZRGBA> color_filter;
 
   pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
-      red_condition(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("r", pcl::ComparisonOps::GT, g_r.data));
+      red_condition_lb(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("r", pcl::ComparisonOps::GE, g_r.data-10));
   pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
-      green_condition(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("g", pcl::ComparisonOps::GT, g_g.data));
-  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
-      blue_condition(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("b", pcl::ComparisonOps::GT, g_b.data));
+      red_condition_ub(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("r", pcl::ComparisonOps::LE, g_r.data+10));
 
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      green_condition_lb(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("g", pcl::ComparisonOps::GE, g_g.data-10));
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      green_condition_ub(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("g", pcl::ComparisonOps::LE, g_g.data+10));
+
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      blue_condition_lb(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("b", pcl::ComparisonOps::GE, g_b.data-5));
+  pcl::PackedRGBComparison<pcl::PointXYZRGBA>::Ptr
+      blue_condition_ub(new pcl::PackedRGBComparison<pcl::PointXYZRGBA>("b", pcl::ComparisonOps::LE, g_b.data+5));
+
+  // pcl::PackedHSIComparison<pcl::PointXYZRGBA>::Ptr
+      // hue_condition_lb(new pcl::PackedHSIComparison<pcl::PointXYZRGBA>("h", pcl::ComparisonOps::GE, g_hue-10));
+
+  // pcl::PackedHSIComparison<pcl::PointXYZRGBA>::Ptr
+  //     hue_condition_ub(new pcl::PackedHSIComparison<pcl::PointXYZRGBA>("h", pcl::ComparisonOps::LE, g_hue));
+    
   pcl::ConditionAnd<pcl::PointXYZRGBA>::Ptr color_cond (new pcl::ConditionAnd<pcl::PointXYZRGBA> ());
-  color_cond->addComparison (red_condition);
-  color_cond->addComparison (green_condition);
-  color_cond->addComparison (blue_condition);
+  color_cond->addComparison (red_condition_lb);
+  color_cond->addComparison (red_condition_ub);
+  color_cond->addComparison (green_condition_lb);
+  color_cond->addComparison (green_condition_ub);
+  color_cond->addComparison (blue_condition_lb);
+  color_cond->addComparison (green_condition_ub);
+  // color_cond->addComparison (hue_condition_lb);
+  // color_cond->addComparison (hue_condition_ub);
+
   // Build the filter
   color_filter.setInputCloud(g_rgb_cloud);
   color_filter.setCondition (color_cond);
   color_filter.filter(*g_cloud_filtered_rgb);
 
-  ROS_INFO("Filtered RGB values: %g %g %g", 
-    g_r.data, g_g.data, g_b.data);
-
-  if (g_r.data ==10 && g_g.data == 10 && g_b.data == 80) {
-  ROS_INFO("Colour: blue");
-  } 
-  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 80) {
-  ROS_INFO("Colour: Purple");
-  } 
-  else if (g_r.data ==80 && g_g.data == 10 && g_b.data == 10) {
-  ROS_INFO("Colour: red");
-  } 
-
-  // Creating the KdTree object for the search method of the extraction
-  pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
-  tree->setInputCloud (g_cloud_filtered_rgb);
+  // // Creating the KdTree object for the search method of the extraction
+  // pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+  // tree->setInputCloud (g_cloud_filtered_rgb);
   // pcl::PCDWriter writer;
-  std::vector<pcl::PointIndices> cluster_indices;
-  pcl::EuclideanClusterExtraction<PointT> ec;
-  ec.setClusterTolerance (0.02); // 2cm
-  ec.setMinClusterSize (100);
-  ec.setMaxClusterSize (25000);
-  ec.setSearchMethod (tree);
-  ec.setInputCloud (g_cloud_filtered_rgb);
-  ec.extract (cluster_indices);
+  // std::vector<pcl::PointIndices> cluster_indices;
+  // pcl::EuclideanClusterExtraction<PointT> ec;
+  // ec.setClusterTolerance (0.05); // 2cm
+  // ec.setMinClusterSize (10);
+  // ec.setMaxClusterSize (25000);
+  // ec.setSearchMethod (tree);
+  // ec.setInputCloud (g_cloud_filtered_rgb);
+  // ec.extract (cluster_indices);
+  
+  // for (auto i: cluster_indices)
+  //   std::cout << i << ' ';
+  // // std::cout << "cluster_indices: " << cluster_indices; 
+  
+  // // pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointE);
+  // int j = 0;
+  // for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+  // {
+  //   pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointE);
+  //   for (const auto& idx : it->indices)
+  //     cloud_cluster->push_back ((*g_cloud_filtered_rgb)[idx]); //*
+  //   cloud_cluster->width = cloud_cluster->size ();
+  //   cloud_cluster->height = 1;
+  //   cloud_cluster->is_dense = true;
 
-  int j = 0;
-  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
-  {
-    pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>);
-    for (const auto& idx : it->indices)
-      cloud_cluster->push_back ((*g_cloud_filtered_rgb)[idx]); //*
-    cloud_cluster->width = cloud_cluster->size ();
-    cloud_cluster->height = 1;
-    cloud_cluster->is_dense = true;
+  //   std::cout << "PointCloud representing the Cluster: " << cloud_cluster->size () << " data points." << std::endl;
+  //   std::stringstream ss;
+  //   ss << "cloud_cluster_" << j << ".pcd";
+  //   writer.write<PointT> (ss.str (), *cloud_cluster, false); //*
+  //   j++;
 
-    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->size () << " data points." << std::endl;
-    std::stringstream ss;
-    ss << "cloud_cluster_" << j << ".pcd";
-    // writer.write<PointT> (ss.str (), *cloud_cluster, false); //*
-    j++;
+  //   geometry_msgs::PointStamped centroids;
+  //   Eigen::Vector4f centroid_in;
+  //   pcl::compute3DCentroid(*cloud_cluster, centroid_in);
 
-  }  
+  //   centroids.header.frame_id = g_input_pc_frame_id_;
+  //   centroids.header.stamp = ros::Time (0);
+  //   // centroids.point = j;
+  //   centroids.point.x = centroid_in[0];
+  //   centroids.point.y = centroid_in[1];
+  //   centroids.point.z = centroid_in[2];
+  //   // findCylPose ((*cloud_cluster)[j]);
+  //   // pubFilteredPCMsg (g_pub_cloud, *cloud_cluster);
+  //   // findCylPose (cloud_cluster);
 
-  pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered_rgb); //g_cloud_filtered_rgb
-  findCylPose (g_cloud_filtered_rgb);
+  //   // std::list<geometry_msgs::PointStamped> centroid_list;
+  //   centroid_list.push_back(centroids);
+  //   std::cout << "number of centroid : " <<  centroid_list.size();
+  // } ; 
+
+  // pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered_rgb);
+
+
+
+
+  // ROS_INFO("Centroid list: ");
+
+  // for (int i=0;i=j;i++)
+  // {
+  //   Eigen::Vector4f centroid_in;
+  //   pcl::compute3DCentroid(*cloud_cluster[i], centroid_in);
+
+  //   // g_cyl_pt_msg.header.frame_id = g_input_pc_frame_id_;
+  //   g_cyl_pt_msg.header.stamp = ros::Time (0);
+  //   g_cyl_pt_msg.point = i
+  //   g_cyl_pt_msg.point.x = centroid_in[0];
+  //   g_cyl_pt_msg.point.y = centroid_in[1];
+  //   g_cyl_pt_msg.point.z = centroid_in[2];
+
+  //   // Transform the point to new frame
+  //   geometry_msgs::PointStamped g_cyl_pt_msg_out;
+  //   try
+  //   {
+  //   g_listener_.transformPoint ("panda_link0",  // bad styling
+  //                           g_cyl_pt_msg,
+  //                           g_cyl_pt_msg_out);
+  //   //ROS_INFO ("trying transform...");
+  //   }
+  //   catch (tf::TransformException& ex)
+  //   {
+  //   ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  //   }
+
+  //   publishPose (g_cyl_pt_msg_out);
+
+  // }
+
+  // for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+  // {
+  //   Eigen::Vector4f centroid; 
+  //   pcl::compute3DCentroid (*g_cloud_filtered_rgb, centroid); 
+  //   ROS_INFO("Centroid values: %g %g %g %g", centroid[0], centroid[1], centroid[2]);
+  // } ;
+  // pubFilteredPCMsg (g_pub_cloud, *cloud_cluster[1]); //g_cloud_filtered_rgb
+  // findCylPose (cloud_cluster);
   // Eigen::Vector4f centroid; 
   // pcl::compute3DCentroid (*g_cloud_filtered_rgb, centroid); 
   // ROS_INFO("Centroid values: %g %g %g %g", centroid[0], centroid[1], centroid[2]);
@@ -559,6 +925,14 @@ CW1::findCentroid(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
 
   // ROS_INFO("Centroid values: %g", 
   //   centroid);
+
+
+  // pcl::PointCloudXYZRGBAtoXYZHSV	(	*g_cloud_filtered_rgb,
+  //   *g_cloud_filtered_hsv)	;
+
+  // ROS_INFO("hsv = %g", g_cloud_filtered_hsv->points[1].h );
+
+  pubFilteredPCMsg (g_pub_cloud_centroid, *g_cloud_filtered_rgb);
 
   return;
 }
@@ -677,39 +1051,46 @@ CW1::segCylind (PointCPtr &in_cloud_ptr)
 void
 CW1::segCube (PointCPtr &in_cloud_ptr)
 {
-  // Create the segmentation object for the planar model
-  // and set all the params
-  g_seg.setOptimizeCoefficients (true);
-  g_seg.setModelType (pcl::SACMODEL_PARALLEL_LINES);
-  g_seg.setNormalDistanceWeight (0.1); //bad style
-  g_seg.setMethodType (pcl::SAC_RANSAC);
-  g_seg.setMaxIterations (100); //bad style
-  g_seg.setDistanceThreshold (0.03); //bad style
-  g_seg.setInputCloud (in_cloud_ptr);
-  g_seg.setInputNormals (g_cloud_normals);
-  // Obtain the plane inliers and coefficients
-  g_seg.segment (*g_inliers_plane, *g_coeff_plane);
-  
-  // Extract the planar inliers from the input cloud
-  g_extract_pc.setInputCloud (in_cloud_ptr);
-  g_extract_pc.setIndices (g_inliers_plane);
-  g_extract_pc.setNegative (false);
-  
-  // Write the planar inliers to disk
-  g_extract_pc.filter (*g_cloud_plane);
-  
-  // Remove the planar inliers, extract the rest
-  g_extract_pc.setNegative (true);
-  g_extract_pc.filter (*g_cloud_filtered2);
-  g_extract_normals.setNegative (true);
-  g_extract_normals.setInputCloud (g_cloud_normals);
-  g_extract_normals.setIndices (g_inliers_plane);
-  g_extract_normals.filter (*g_cloud_normals2);
+  pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>), 
+    cloud_f (new pcl::PointCloud<PointT>);
 
-  //ROS_INFO_STREAM ("Plane coefficients: " << *g_coeff_plane);
-  ROS_INFO_STREAM ("PointCloud representing the planar component: "
-                   << g_cloud_plane->size ()
-                   << " data points.");
+  pcl::SACSegmentation<PointT> seg;
+  pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+  pcl::PointCloud<PointT>::Ptr cloud_plane (new pcl::PointCloud<PointT> ());
+  pcl::PCDWriter writer;
+  seg.setOptimizeCoefficients (true);
+  seg.setModelType (pcl::SACMODEL_PLANE);
+  seg.setMethodType (pcl::SAC_RANSAC);
+  seg.setMaxIterations (100);
+  seg.setDistanceThreshold (0.02);
+
+  int nr_points = (int) in_cloud_ptr->size ();
+  while (in_cloud_ptr->size () > 0.3 * nr_points)
+  {
+    // Segment the largest planar component from the remaining cloud
+    seg.setInputCloud (in_cloud_ptr);
+    seg.segment (*inliers, *coefficients);
+    if (inliers->indices.size () == 0)
+    {
+      std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
+      break;
+    }
+    // Extract the planar inliers from the input cloud
+    pcl::ExtractIndices<PointT> extract;
+    extract.setInputCloud (in_cloud_ptr);
+    extract.setIndices (inliers);
+    extract.setNegative (false);
+
+    // Get the points associated with the planar surface
+    extract.filter (*cloud_plane);
+    // std::cout << "PointCloud representing the planar component: " << cloud_plane->size () << " data points." << std::endl;
+
+    // Remove the planar inliers, extract the rest
+    extract.setNegative (true);
+    extract.filter (*cloud_f);
+    *in_cloud_ptr = *cloud_f;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -768,6 +1149,8 @@ CW1::publishPose (geometry_msgs::PointStamped &cyl_pt_msg)
   return;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 void
 CW1::pubFilteredRGB (ros::Publisher &pc_pub,
                                PointE &pc)
@@ -780,6 +1163,136 @@ CW1::pubFilteredRGB (ros::Publisher &pc_pub,
   return;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+void
+CW1::euclideanCluster (PointCPtr &in_cloud_ptr)
+
+{
+  pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+  tree->setInputCloud (in_cloud_ptr);
+  pcl::PCDWriter writer;
+  std::vector<pcl::PointIndices> cluster_indices;
+  pcl::EuclideanClusterExtraction<PointT> ec;
+  ec.setClusterTolerance (0.05); // 2cm
+  ec.setMinClusterSize (1);
+  ec.setMaxClusterSize (25000);
+  ec.setSearchMethod (tree);
+  ec.setInputCloud (in_cloud_ptr);
+  ec.extract (cluster_indices);
+  
+  // for (auto i: cluster_indices)
+  //   std::cout << i << ' ';
+  // std::cout << "cluster_indices: " << cluster_indices; 
+  
+  // pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointE);
+  centroid_list.clear();
+  int j = 0;
+  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+  {
+    pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointE);
+    for (const auto& idx : it->indices)
+      cloud_cluster->push_back ((*in_cloud_ptr)[idx]); //*
+    cloud_cluster->width = cloud_cluster->size ();
+    cloud_cluster->height = 1;
+    cloud_cluster->is_dense = true;
+
+    std::cout << "cloud cluster " << j << "\n";
+    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->size () << " data points.\n" << std::endl;
+    std::stringstream ss;
+    ss << "cloud_cluster_" << j+1 << ".pcd";
+    writer.write<PointT> (ss.str (), *cloud_cluster, false); //*
+    j++;
+
+    geometry_msgs::PointStamped centroids;
+    Eigen::Vector4f centroid_in;
+    pcl::compute3DCentroid(*cloud_cluster, centroid_in);
+
+    centroids.header.frame_id = g_input_pc_frame_id_;
+    centroids.header.stamp = ros::Time (0);
+    // centroids.point = j;
+    centroids.point.x = centroid_in[0];
+    centroids.point.y = centroid_in[1];
+    centroids.point.z = centroid_in[2];
+    // findCylPose ((*cloud_cluster)[j]);
+    // pubFilteredPCMsg (g_pub_cloud, *cloud_cluster);
+    // findCylPose (cloud_cluster);
+
+    // std::list<geometry_msgs::PointStamped> centroid_list;
+    // centroid_list.push_back(centroids);
+      // Transform the point to new frame
+    geometry_msgs::PointStamped g_cyl_pt_msg_out;
+    try
+    {
+      g_listener_.transformPoint ("world",  // bad styling
+                                  centroids,
+                                  g_cyl_pt_msg_out);
+      //ROS_INFO ("trying transform...");
+    }
+    catch (tf::TransformException& ex)
+    {
+      ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+    }
+ 
+    centroid_list.push_back(g_cyl_pt_msg_out);
+    publishPose (g_cyl_pt_msg_out);
+
+
+  } ; 
+
+  // for (auto i: centroid_list)
+  // // auto it = yourList.begin();
+  // // std::advance(it, index);
+  //   std::cout << 'centroid list: ' << i ;
+  if (centroid_list.empty())
+      std::cout << "No centroid found\n";
+
+  return;
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void
+CW1::addCollisionObject(std::string object_name,
+  geometry_msgs::Point centre, geometry_msgs::Vector3 dimensions,
+  geometry_msgs::Quaternion orientation)
+{
+  /* add a collision object in RViz and the MoveIt planning scene */
+
+  // create a collision object message, and a vector of these messages
+  moveit_msgs::CollisionObject collision_object;
+  std::vector<moveit_msgs::CollisionObject> object_vector;
+  
+  // input header information
+  collision_object.id = object_name;
+  collision_object.header.frame_id = base_frame_;
+
+  // define the primitive and its dimensions
+  collision_object.primitives.resize(1);
+  collision_object.primitives[0].type = collision_object.primitives[0].BOX;
+  collision_object.primitives[0].dimensions.resize(3);
+  collision_object.primitives[0].dimensions[0] = dimensions.x;
+  collision_object.primitives[0].dimensions[1] = dimensions.y;
+  collision_object.primitives[0].dimensions[2] = dimensions.z;
+
+  // define the pose of the collision object
+  collision_object.primitive_poses.resize(1);
+  collision_object.primitive_poses[0].position.x = centre.x;
+  collision_object.primitive_poses[0].position.y = centre.y;
+  collision_object.primitive_poses[0].position.z = centre.z;
+  collision_object.primitive_poses[0].orientation = orientation;
+
+  // define that we will be adding this collision object 
+  // hint: what about collision_object.REMOVE?
+  collision_object.operation = collision_object.ADD;
+
+  // add the collision object to the vector, then apply to planning scene
+  object_vector.push_back(collision_object);
+  planning_scene_interface_.applyCollisionObjects(object_vector);
+
+  return;
+}
 ////////////////////////////////////////////////////////////////////////////////
 // void
 // CW1::applyVXRGB (PointEPtr &in_cloud_ptr,
@@ -857,4 +1370,3 @@ CW1::pubFilteredRGB (ros::Publisher &pc_pub,
 //                    << g_cloud_plane->size ()
 //                    << " data points.");
 // }
-    

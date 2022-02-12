@@ -16,7 +16,7 @@ int main(int argc, char** argv)
   ros::Subscriber sub_rgb =
   nh.subscribe ("/r200/camera/depth_registered/points",
                 1,
-                &CW1::findCentroid,
+                &CW1::colourFilter,
                 &CW1_object);
 
   // loop rate in Hz
