@@ -19,6 +19,7 @@ int main(int argc, char** argv)
                 &CW1::colourFilter,
                 &CW1_object);
 
+
   // loop rate in Hz
   ros::Rate rate(30);
 

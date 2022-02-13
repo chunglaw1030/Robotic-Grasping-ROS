@@ -71,6 +71,10 @@
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/point_types_conversion.h>
+#include <pcl/filters/crop_hull.h>
+#include <pcl/Vertices.h>
+#include <pcl/surface/convex_hull.h>
+#include <pcl/surface/concave_hull.h>
 
 // TF specific includes
 #include <tf/transform_broadcaster.h>
@@ -91,6 +95,8 @@ typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointC;
 typedef PointC::Ptr PointCPtr;
 
+typedef pcl::Vertices Vertices;
+
 typedef pcl::PointXYZRGBA PointD;
 typedef pcl::PointCloud<PointD> PointE;
 typedef PointE::Ptr PointEPtr;
@@ -105,56 +111,34 @@ class CW1
     CW1 (ros::NodeHandle &nh);
 
     /** \brief Service callback function for task1
-      *
+      *        for pick and place.
       * \input[in] request service request message 
+      * \input[in] move arm to object_loc to pick up object
+      * \input[in] move arm to goal_loc to place object
       */
     bool
     task1Callback(cw1_world_spawner::Task1Service::Request &request,
       cw1_world_spawner::Task1Service::Response &response);
 
     /** \brief Service callback function for task2
-      *
-      * \input[in] request service request message 
+      *        for object detection and localization
+      * \input[in] request service request message containing
+      * r g b values of colour of object that neesds to 
+      * be localised
       */
     bool
     task2Callback(cw1_world_spawner::Task2Service::Request &request,
       cw1_world_spawner::Task2Service::Response &response);
 
-    /** \brief Service callback function for task3
-      *
-      * \input[in] request service request message 
+    /** \brief Service callback function for task3 
+      *        to pick up blue objects
+      * \input[in] request service request message containing
+      * r g b values of colour of object that needs to 
+      * be picked and placed into the goal location
       */
     bool
     task3Callback(cw1_world_spawner::Task3Service::Request &request,
       cw1_world_spawner::Task3Service::Response &response);
-
-    /** \brief Task1 function for pick and place.
-        *
-        * \input[in] move arm to object_loc to pick up object
-        * \input[in] move arm to goal_loc to place object
-        * 
-        * \return true if moved to target position 
-        */
-    bool 
-    task1(geometry_msgs::PoseStamped object_loc, 
-      geometry_msgs::PoseStamped goal_loc);
-
-    /** \brief Task2 function for object detection and localization
-      *
-      * \input[in] r g b values of colour of object that neesds to 
-      * be localised
-      */
-    void 
-    task2(std_msgs::Float32 r, std_msgs::Float32 g, std_msgs::Float32 b);
-
-    /** \brief Task3 function to pick up blue objects
-      *
-      * \input[in] r g b values of colour of object that neesds to 
-      * be localised
-      */
-    bool
-    task3(std_msgs::Float32 r, std_msgs::Float32 g, std_msgs::Float32 b,
-      geometry_msgs::PoseStamped goal_loc);
 
     /** \brief Pick an object up with a given position.
       * 
@@ -172,6 +156,19 @@ class CW1
     bool 
     moveArm(geometry_msgs::Pose target_pose);
 
+    /** \brief MoveIt function to move back to starting position.
+      *
+      * \input[in] target joint values to move the arm to
+      *
+      * \return true if moved to target position 
+      */
+    bool
+    moveHomePosition(const std::vector< double > &group_variable_values);
+
+    bool
+    moveCartesian(geometry_msgs::Pose current_pose,
+      geometry_msgs::Pose target_pose);
+
     /** \brief MoveIt function for moving the gripper fingers to a new position. 
       *
       * \input[in] width desired gripper finger width
@@ -188,13 +185,33 @@ class CW1
     bool
     drop(geometry_msgs::Point position);
 
+    /** \brief Filter out point cloud based on RGB values
+      * 
+      * \input[in] position, xyz coordinates of the box
+      */
     void
     colourFilter(const sensor_msgs::PointCloud2ConstPtr& cloud_input_msg);
 
     void
+    filterPurpleRedCubes(PointCPtr & red_purple_cloud);
+
+    /** \brief MoveIt function for adding a cuboid collision object in RViz
+      * and the MoveIt planning scene.
+      *
+      * \input[in] object_name name for the new object to be added
+      * \input[in] centre point at which to add the new object
+      * \input[in] dimensions dimensions of the cuboid to add in x,y,z
+      * \input[in] orientation rotation to apply to the cuboid before adding
+      */
+    void
     addCollisionObject(std::string object_name, geometry_msgs::Point centre, 
     geometry_msgs::Vector3 dimensions, geometry_msgs::Quaternion orientation);
 
+    /** \brief Apply Voxel Grid filtering.
+      * 
+      * \input[in] in_cloud_ptr the input PointCloud2 pointer
+      * \input[out] out_cloud_ptr the output PointCloud2 pointer
+      */
     void
     applyVX (PointCPtr &in_cloud_ptr,
               PointCPtr &out_cloud_ptr);
@@ -267,38 +284,22 @@ class CW1
 
     void
     euclideanCluster (PointCPtr &in_cloud_ptr);
-    // void
-    // applyVXRGB (PointEPtr &in_cloud_ptr,
-    //                   PointEPtr &out_cloud_ptr);
 
-    // void
-    // applyPTRGB (PointEPtr &in_cloud_ptr,
-    //                   PointEPtr &out_cloud_ptr);
+    void
+    redPurpleCluster (PointCPtr &in_cloud_ptr);
 
-    // void
-    // findNormalsRGB (PointEPtr &in_cloud_ptr);
-
-    // void
-    // segPlaneRGB (PointEPtr &in_cloud_ptr);
-
-    /* Variables */
-
-    /** \brief Define some useful constant values */
-    std::string base_frame_ = "panda_link0";
-    double gripper_open_ = 80e-3;
-    double gripper_closed_ = 0.0;
-
-    /** \brief Parameters to define the pick operation */
-    double z_offset_ = 0.1; //0.125
-    double angle_offset_ = 3.14159 / 4.0;
-    double approach_distance_ = 0.125;
-    double approach_box_ = 0.15;
-    double home_pose_ = 0;
-
+    void 
+    addCollisionTask3 (std::list<geometry_msgs::PointStamped> 
+      &red_purple_cubes, geometry_msgs::Point &goal_location);
     
+    // void
+    // applyCropHull (PointCPtr &in_cloud_ptr,
+    //   geometry_msgs::Point &goal_location,
+    //   PointCPtr &out_cloud_ptr);
+    void
+    applyCropHull (PointCPtr &in_cloud_ptr);
 
 
-    
     /** \brief Node handle. */
     ros::NodeHandle nh_;
 
@@ -328,9 +329,16 @@ class CW1
 
     /** \brief ROS publishers. */
     ros::Publisher g_pub_cloud_centroid;
+
+    ros::Publisher g_pub_purple_red;
+
+    ros::Publisher g_pub_crop_hull;
     
     /** \brief ROS geometry message point. */
     geometry_msgs::PointStamped g_cyl_pt_msg;
+
+    /** \brief ROS geometry message point. */
+    geometry_msgs::PointStamped g_rpc_pt_msg;
     
     /** \brief ROS pose publishers. */
     ros::Publisher g_pub_pose;
@@ -350,6 +358,9 @@ class CW1
     /** \brief Point Cloud (input). */
     pcl::PCLPointCloud2 g_pcl_pc;
     
+    /** \brief Point Cloud (input). */
+    pcl::PCLPointCloud2 g_pcl_pc_red_purple;
+
     /** \brief Voxel Grid filter. */
     pcl::VoxelGrid<PointT> g_vx;
     
@@ -398,23 +409,67 @@ class CW1
     /** \brief cw1Q1: TF listener definition. */
     tf::TransformListener g_listener_;
     
+        /** \brief cw1Q1: TF listener definition. */
+    tf::TransformListener g_listener2_;
+
     /** \brief Point indices for rgb cloud. */
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_rgb_cloud;
 
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_red_purple_cloud;
+
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_cloud_filtered_rgb;
+
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_cloud_crop_hull;
 
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr g_cloud_filtered_hsv;
 
-    // std_msgs::Float32 g_r = 0.0f;
-    // std_msgs::Float32 g_g = 0.0f;
-    // std_msgs::Float32 g_b = 0.0f;
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_red_purple_cube_cloud;
+
+    std::string g_required_colour ;
+
+    geometry_msgs::Point g_box_location;
+
+    // pcl::CropHull<PointT> g_crop_hull;
+    pcl::CropHull<pcl::PointXYZRGBA> g_crop_hull;
+
+    std::vector<double> g_home_postion{2.51666e-06, 0.00104981,
+      -3.50591e-05, -1.57243, 3.87816e-05, 1.57093, 0.784965};
+
     std_msgs::Float32 g_r;
     std_msgs::Float32 g_g;
     std_msgs::Float32 g_b;
 
+    double g_red_purple_cube_r = 80;
+    double g_red_purple_cube_g = 10;
+
     double g_hue;
 
     std::list<geometry_msgs::PointStamped> centroid_list;
+
+    std::list<geometry_msgs::PointStamped> centroid_list2;
+
+    geometry_msgs::Pose g_task3_pose1 ;
+    geometry_msgs::Pose g_task3_pose2 ;
+    geometry_msgs::Pose g_task3_pose_test ;
+    geometry_msgs::Quaternion grasp_orientation;
+    geometry_msgs::Quaternion box_orientation;
+    /* Variables */
+
+    /** \brief Define some useful constant values */
+    std::string base_frame_ = "panda_link0";
+    double gripper_open_ = 80e-3;
+    double gripper_closed_ = 0.0;
+
+    /** \brief Parameters to define the pick operation */
+    double z_offset_ = 0.1; //0.125
+    double angle_offset_ = 3.14159 / 4.0;
+    double angle_offset2_ = 3.14159 / 10.0;
+    double approach_distance_ = 0.14;
+    double approach_box_ = 0.15;
+    double home_pose_ = 0;
+
+
+
     // geometry_msgs::PointStamped[] centroids
 
     // /** \brief Voxel Grid filter. */
