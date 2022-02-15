@@ -239,13 +239,6 @@ class CW1
     void
     segPlane (PointCPtr &in_cloud_ptr);
 
-    /** \brief Segment Cylinder from point cloud.
-      * 
-      * \input[in] in_cloud_ptr the input PointCloud2 pointer
-      */
-    void
-    segCylind (PointCPtr &in_cloud_ptr);
-
     /** \brief Segment cube from point cloud.
       * 
       * \input[in] in_cloud_ptr the input PointCloud2 pointer
@@ -344,7 +337,7 @@ class CW1
     ros::Publisher g_pub_pose;
     
     /** \brief Voxel Grid filter's leaf size. */
-    double g_vg_leaf_sz;
+    // double g_vg_leaf_sz;
     
     /** \brief Point Cloud (input) pointer. */
     PointCPtr g_cloud_ptr;
@@ -368,7 +361,7 @@ class CW1
     pcl::PassThrough<PointT> g_pt;
     
     /** \brief Pass Through min and max threshold sizes. */
-    double g_pt_thrs_min, g_pt_thrs_max;
+    // double g_pt_thrs_min, g_pt_thrs_max;
     
     /** \brief KDTree for nearest neighborhood search. */
     pcl::search::KdTree<PointT>::Ptr g_tree_ptr;
@@ -379,8 +372,8 @@ class CW1
     /** \brief Cloud of normals. */
     pcl::PointCloud<pcl::Normal>::Ptr g_cloud_normals, g_cloud_normals2;
     
-    /** \brief Nearest neighborhooh size for normal estimation. */
-    double g_k_nn;
+    // /** \brief Nearest neighborhooh size for normal estimation. */
+    // double g_k_nn;
     
     /** \brief SAC segmentation. */
     pcl::SACSegmentationFromNormals<PointT, pcl::Normal> g_seg; 
@@ -439,11 +432,6 @@ class CW1
     std_msgs::Float32 g_g;
     std_msgs::Float32 g_b;
 
-    double g_red_purple_cube_r = 80;
-    double g_red_purple_cube_g = 10;
-
-    double g_hue;
-
     std::list<geometry_msgs::PointStamped> centroid_list;
 
     std::list<geometry_msgs::PointStamped> centroid_list2;
@@ -468,30 +456,21 @@ class CW1
     double approach_box_ = 0.15;
     double home_pose_ = 0;
 
+    double g_red_purple_cube_r = 80;
+    double g_red_purple_cube_g = 10;
+    double g_hue;
 
+    double g_hue_blue = -84.7;
+    double g_hue_purple = -42.3;
+    double g_hue_red = 0.97;
+    double g_rbg_tolerance = 10;
+    double g_hue_tolerance = 15;
 
-    // geometry_msgs::PointStamped[] centroids
+    double g_vg_leaf_sz = 0.01; // VoxelGrid leaf size
+    double g_pt_thrs_min = -0.2; // PassThrough min thres
+    double g_pt_thrs_max = 2.0; // PassThrough max thres
+    double g_k_nn = 50; // Normals nn size
 
-    // /** \brief Voxel Grid filter. */
-    // pcl::VoxelGrid<PointD> g_vx;
-
-    // pcl::PassThrough<PointT> g_pt;
-
-    // pcl::NormalEstimation<PointT, pcl::Normal> g_ne;
-
-    // /** \brief SAC segmentation. */
-    // pcl::SACSegmentationFromNormals<PointT, pcl::Normal> g_seg; 
-    
-    // /** \brief Extract point cloud indices. */
-    // pcl::ExtractIndices<PointT> g_extract_pc;
-  
-    // /** \brief Extract point cloud normal indices. */
-    // pcl::ExtractIndices<pcl::Normal> g_extract_normals;
-
-    // /** \brief Point indices for plane. */
-    // pcl::PointIndices::Ptr g_inliers_plane;
-
-    // PointCPtr g_cloud_plane, g_cloud_cylinder;
   protected:
     /** \brief Debug mode. */
     bool debug_;
