@@ -97,9 +97,9 @@ typedef PointC::Ptr PointCPtr;
 
 typedef pcl::Vertices Vertices;
 
-typedef pcl::PointXYZRGBA PointD;
-typedef pcl::PointCloud<PointD> PointE;
-typedef PointE::Ptr PointEPtr;
+// typedef pcl::PointXYZRGBA PointD;
+// typedef pcl::PointCloud<PointD> PointE;
+// typedef PointE::Ptr PointEPtr;
 
 class CW1 
 {
@@ -165,6 +165,12 @@ class CW1
     bool
     moveHomePosition(const std::vector< double > &group_variable_values);
 
+    /** \brief MoveIt function to perform a cartesian movement when picking cubes.
+      *
+      * \input[in] target pose to move the arm to
+      *
+      * \return true if moved to target position 
+      */
     bool
     moveCartesian(geometry_msgs::Pose current_pose,
       geometry_msgs::Pose target_pose);
@@ -192,8 +198,12 @@ class CW1
     void
     colourFilter(const sensor_msgs::PointCloud2ConstPtr& cloud_input_msg);
 
+    /** \brief Filter to extract the purple and red cubes 
+    * 
+    * \input[in] input pointcloud
+    */
     void
-    filterPurpleRedCubes(PointCPtr & red_purple_cloud);
+    filterPurpleRedCubes(PointCPtr & in_cloud_ptr);
 
     /** \brief MoveIt function for adding a cuboid collision object in RViz
       * and the MoveIt planning scene.
@@ -225,35 +235,13 @@ class CW1
     applyPT (PointCPtr &in_cloud_ptr,
               PointCPtr &out_cloud_ptr);
 
-    /** \brief Normal estimation.
-      * 
-      * \input[in] in_cloud_ptr the input PointCloud2 pointer
-      */
-    void
-    findNormals (PointCPtr &in_cloud_ptr);
 
-    /** \brief Segment Plane from point cloud.
+    /** \brief Segment plane for cube tasks.
       * 
       * \input[in] in_cloud_ptr the input PointCloud2 pointer
       */
     void
     segPlane (PointCPtr &in_cloud_ptr);
-
-    /** \brief Segment cube from point cloud.
-      * 
-      * \input[in] in_cloud_ptr the input PointCloud2 pointer
-      */
-    void
-    segCube (PointCPtr &in_cloud_ptr);
-
-
-
-    /** \brief Find the Pose of Cylinder.
-      * 
-      * \input[in] in_cloud_ptr the input PointCloud2 pointer
-      */
-    void
-    findCylPose (PointCPtr &in_cloud_ptr);
 
     /** \brief Point Cloud publisher.
       * 
@@ -263,43 +251,54 @@ class CW1
     void
     pubFilteredPCMsg (ros::Publisher &pc_pub, PointC &pc);
 
-    /** \brief Publish the cylinder point.
+    /** \brief Publish the point.
       * 
-      *  \input[in] cyl_pt_msg Cylinder's geometry point
+      *  \input[in] cube_pt_msg cube's geometry point
       *  
-      *  \output true if three numbers are added
       */
     void
-    publishPose (geometry_msgs::PointStamped &cyl_pt_msg);
+    publishPose (geometry_msgs::PointStamped &cube_pt_msg);
 
+    /** \brief Publish the filtered point cloud.
+    * 
+    *  \input[in] publisher and filtered point cloud
+    *  
+    */
     void
-    pubFilteredRGB (ros::Publisher &pc_pub, PointE &pc);
+    pubFilteredRGB (ros::Publisher &pc_pub, PointC &pc);
 
+    /** \brief Perform Euclidean Clustering to find clusters of cubes
+    * 
+    *  \input[in] in_cloud_ptr the input PointCloud2 pointer
+    *  
+    */
     void
     euclideanCluster (PointCPtr &in_cloud_ptr);
 
+    /** \brief Perform Euclidean Clustering to find clusters of 
+    * red and purple cubes
+    * 
+    *  \input[in] in_cloud_ptr the input PointCloud2 pointer
+    *  
+    */
     void
     redPurpleCluster (PointCPtr &in_cloud_ptr);
 
+    /** \brief Add golf tiles, basket (and red and purple cubes in task 3)
+    * as collision items  
+    * 
+    *  \input[in] location of basket
+    */
     void 
-    addCollisionTask3 (std::list<geometry_msgs::PointStamped> 
-      &red_purple_cubes, geometry_msgs::Point &goal_location);
+    addCollisionItems (geometry_msgs::Point &goal_location);
     
-    // void
-    // applyCropHull (PointCPtr &in_cloud_ptr,
-    //   geometry_msgs::Point &goal_location,
-    //   PointCPtr &out_cloud_ptr);
+    /** \brief CropHull filter to filter parts of point clouds  
+    * 
+    *  \input[in] in_cloud_ptr the input PointCloud2 pointer
+    */
     void
     applyCropHull (PointCPtr &in_cloud_ptr);
 
-
-    /** \brief Node handle. */
-    ros::NodeHandle nh_;
-
-    /** \brief  service servers for advertising ROS services  */
-    ros::ServiceServer task1_srv_;
-    ros::ServiceServer task2_srv_;
-    ros::ServiceServer task3_srv_;
 
     /** \brief MoveIt interface to move groups to seperate the arm and the gripper,
       * these are defined in urdf. */
@@ -309,8 +308,13 @@ class CW1
     /** \brief MoveIt interface to interact with the moveit planning scene 
       * (eg collision objects). */
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
+    // moveit::planning_interface::MoveGroupInterface::Plan g_my_plan;
 
   public:
+
+    /** \brief  service servers for advertising ROS services  */
+    ros::ServiceServer task1_srv_, task2_srv_, task3_srv_;
+
     /** \brief Node handle. */
     ros::NodeHandle g_nh;
     
@@ -326,22 +330,13 @@ class CW1
     ros::Publisher g_pub_purple_red;
 
     ros::Publisher g_pub_crop_hull;
-    
-    /** \brief ROS geometry message point. */
-    geometry_msgs::PointStamped g_cyl_pt_msg;
 
     /** \brief ROS geometry message point. */
     geometry_msgs::PointStamped g_rpc_pt_msg;
     
     /** \brief ROS pose publishers. */
     ros::Publisher g_pub_pose;
-    
-    /** \brief Voxel Grid filter's leaf size. */
-    // double g_vg_leaf_sz;
-    
-    /** \brief Point Cloud (input) pointer. */
-    PointCPtr g_cloud_ptr;
-    
+            
     /** \brief Point Cloud (filtered) pointer. */
     PointCPtr g_cloud_filtered, g_cloud_filtered2;
     
@@ -359,12 +354,12 @@ class CW1
     
     /** \brief Pass Through filter. */
     pcl::PassThrough<PointT> g_pt;
-    
-    /** \brief Pass Through min and max threshold sizes. */
-    // double g_pt_thrs_min, g_pt_thrs_max;
-    
+        
     /** \brief KDTree for nearest neighborhood search. */
     pcl::search::KdTree<PointT>::Ptr g_tree_ptr;
+
+    /** \brief KDTree for nearest neighborhood search. */
+    pcl::search::KdTree<PointT>::Ptr g_tree_cluster_ptr;
     
     /** \brief Normal estimation. */
     pcl::NormalEstimation<PointT, pcl::Normal> g_ne;
@@ -386,18 +381,13 @@ class CW1
     
     /** \brief Point indices for plane. */
     pcl::PointIndices::Ptr g_inliers_plane;
-      
-    /** \brief Point indices for cylinder. */
-    pcl::PointIndices::Ptr g_inliers_cylinder;
-    
+          
     /** \brief Model coefficients for the plane segmentation. */
     pcl::ModelCoefficients::Ptr g_coeff_plane;
     
-    /** \brief Model coefficients for the culinder segmentation. */
-    pcl::ModelCoefficients::Ptr g_coeff_cylinder;
     
     /** \brief Point cloud to hold plane and cylinder points. */
-    PointCPtr g_cloud_plane, g_cloud_cylinder;
+    PointCPtr g_cloud_plane;
     
     /** \brief cw1Q1: TF listener definition. */
     tf::TransformListener g_listener_;
@@ -405,26 +395,52 @@ class CW1
         /** \brief cw1Q1: TF listener definition. */
     tf::TransformListener g_listener2_;
 
+    pcl::ConditionalRemoval<PointT> color_filter, color_filter_red_purple;
+
+    // pcl::PackedRGBComparison<PointT>::Ptr
+    //   red_condition_lb, red_condition_ub;
+
+    // pcl::PackedRGBComparison<PointT>::Ptr
+    //   green_condition_lb, green_condition_ub;
+
+    // pcl::PackedRGBComparison<PointT>::Ptr
+    //   blue_condition_lb, blue_condition_ub;
+
+    // pcl::PackedHSIComparison<PointT>::Ptr
+    //   hue_condition_lb, hue_condition_ub;
+
+    // pcl::PackedRGBComparison<PointT>::Ptr
+    //   red_purple_r_lb, red_purple_r_ub;
+
+    // pcl::PackedRGBComparison<PointT>::Ptr
+    //   red_purple_g_lb, red_purple_g_ub;
+
+    // pcl::ConditionAnd<PointT>::Ptr g_color_cond, g_color_cond_red_purple;
+
     /** \brief Point indices for rgb cloud. */
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_rgb_cloud;
+    PointCPtr g_rgb_cloud, g_cloud_filtered_rgb, 
+      g_cloud_crop_hull, g_red_purple_cube_cloud;
 
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_red_purple_cloud;
+    /** \brief Quaternion to define box and grasp orientation */
+    tf2::Quaternion q_x180deg, q_object, q_object2, q_result, q_result2;
+    
+    geometry_msgs::Quaternion g_box_orientation, grasp_orientation;
 
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_cloud_filtered_rgb;
+    /** \brief Point and dimensions defined for collision items. */
+    geometry_msgs::Point g_floor_centre, g_cube_centre, g_box_centre, g_box_location;
+    
+    geometry_msgs::Vector3 g_floor_dimensions, g_cube_dimensions, g_box_dimensions;
 
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_cloud_crop_hull;
-
-    pcl::PointCloud<pcl::PointXYZHSV>::Ptr g_cloud_filtered_hsv;
-
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr g_red_purple_cube_cloud;
+    std::string g_floor = "floor", g_box = "box", g_cube = "cube", 
+      g_target_frame = "world", g_panda_link0 = "panda_link0";
+    
+    std::string base_frame_ = "panda_link0";
 
     std::string g_required_colour ;
 
-    geometry_msgs::Point g_box_location;
+    pcl::CropHull<PointT> g_crop_hull;
 
-    // pcl::CropHull<PointT> g_crop_hull;
-    pcl::CropHull<pcl::PointXYZRGBA> g_crop_hull;
-
+    /** \brief joint positions of robot for home position */
     std::vector<double> g_home_postion{2.51666e-06, 0.00104981,
       -3.50591e-05, -1.57243, 3.87816e-05, 1.57093, 0.784965};
 
@@ -432,29 +448,69 @@ class CW1
     std_msgs::Float32 g_g;
     std_msgs::Float32 g_b;
 
-    std::list<geometry_msgs::PointStamped> centroid_list;
+    /** \brief Centroid list for task 2 and 3 */
+    std::list<geometry_msgs::PointStamped> g_centroid_list;
 
-    std::list<geometry_msgs::PointStamped> centroid_list2;
+    /** \brief Centroid list of red and purple cubes */
+    std::list<geometry_msgs::PointStamped> g_centroid_list2;
 
+    /** \brief collision objects  */
+    moveit_msgs::CollisionObject g_collision_object;
+
+    std::vector<moveit_msgs::CollisionObject> g_object_vector;
+
+    /** \brief define robot poses for task 2 and 3 */
+    geometry_msgs::Pose g_task2_pose ;
     geometry_msgs::Pose g_task3_pose1 ;
     geometry_msgs::Pose g_task3_pose2 ;
     geometry_msgs::Pose g_task3_pose_test ;
-    geometry_msgs::Quaternion grasp_orientation;
-    geometry_msgs::Quaternion box_orientation;
-    /* Variables */
 
+    /* Variables */   
+    const tf2Scalar q_x180deg_x = -1;
+    const tf2Scalar q_x180deg_y = 0;
+    const tf2Scalar q_x180deg_z = 0;
+    const tf2Scalar q_x180deg_w = 0;
+    
     /** \brief Define some useful constant values */
-    std::string base_frame_ = "panda_link0";
     double gripper_open_ = 80e-3;
     double gripper_closed_ = 0.0;
 
-    /** \brief Parameters to define the pick operation */
-    double z_offset_ = 0.1; //0.125
+    /** \brief Parameters to define the pick and place operation */
+    double g_pick_offset_;
+    double pick_offset_task1 = 0.125; //0.125
+    double pick_offset_task3 = 0.095; //0.125
     double angle_offset_ = 3.14159 / 4.0;
+    double angle_offset1_ = 0;
     double angle_offset2_ = 3.14159 / 10.0;
-    double approach_distance_ = 0.14;
+    double approach_distance_ = 0.18;
+    double g_drop_distance_ = 0.14;
     double approach_box_ = 0.15;
     double home_pose_ = 0;
+    double box_centre_offset = 0.1;
+
+    double g_task2_pose_x = 0.1;
+    double g_task2_pose_y = 0;
+    double g_task2_pose_z = 0.85;
+
+    double g_task3_pose1_x = 0.3;
+    double g_task3_pose1_y = 0;
+    double g_task3_pose1_z = 0.85;
+    double g_task3_pose2_x = -0.3;
+
+    /** \brief Parameters to define RGB and hue values and tolerances */
+    double g_rgb_convert = 100;
+
+    double g_blue_r_value = 10;
+    double g_blue_g_value = 10;
+    double g_blue_b_value = 80;
+
+    double g_purple_r_value = 80;
+    double g_purple_g_value = 10;
+    double g_purple_b_value = 80;
+
+    double g_red_r_value = 80;
+    double g_red_g_value = 10;
+    double g_red_b_value = 10;
 
     double g_red_purple_cube_r = 80;
     double g_red_purple_cube_g = 10;
@@ -466,10 +522,48 @@ class CW1
     double g_rbg_tolerance = 10;
     double g_hue_tolerance = 15;
 
+    /** \brief Parameters to define voxel grid and pass through filters */
     double g_vg_leaf_sz = 0.01; // VoxelGrid leaf size
     double g_pt_thrs_min = -0.2; // PassThrough min thres
     double g_pt_thrs_max = 2.0; // PassThrough max thres
     double g_k_nn = 50; // Normals nn size
+    double seg_max_it = 100;
+    double seg_dist_thres = 0.02;
+
+    /** \brief Parameters to define cartesian move */
+    const double g_jump_threshold = 0.0;
+    const double g_eef_step = 0.01;
+    double g_fraction;
+
+    /** \brief Parameters to define collision object */
+    double g_box_dimensions_x = 0.2;
+    double g_box_dimensions_y = 0.2;
+    double g_box_dimensions_z = 0.2;
+
+    double g_box_orientation_x = 0;
+    double g_box_orientation_y = 0;
+    double g_box_orientation_z = 0;
+    double g_box_orientation_w = -1;
+
+    double g_cube_dimensions_x = 0.04;
+    double g_cube_dimensions_y = 0.04;
+    double g_cube_dimensions_z = 0.04;
+
+    double g_floor_dimensions_x = 2;
+    double g_floor_dimensions_y = 2;
+    double g_floor_dimensions_z = 0.032;
+
+    double g_floor_centre_x = 0;
+    double g_floor_centre_y = 0;
+    double g_floor_centre_z = 0;
+
+    /** \brief Parameters to define Euclidean Clustering */
+    double g_cluster_tolerance = 0.02;
+    double min_cluster_size = 2;
+    double max_cluster_size = 20;
+
+    /** \brief Parameters to Crop Hull filter */
+    double concave_hull_alpha = 20;
 
   protected:
     /** \brief Debug mode. */
