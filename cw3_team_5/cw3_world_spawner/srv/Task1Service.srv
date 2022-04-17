@@ -1,0 +1,4 @@
+---
+std_msgs/ColorRGBA[] stack_colours
+geometry_msgs/Point stack_point
+float32 stack_rotation
