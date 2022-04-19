@@ -82,16 +82,18 @@ CW3::CW3(ros::NodeHandle &nh):
     service_ns.c_str());
 
     // Define the publishers
-  g_pub_cloud = nh.advertise<sensor_msgs::PointCloud2> ("filtered_cloud", 1, true);
+  g_pub_cloud = nh.advertise<sensor_msgs::PointCloud2> ("filtered_cloud_no_floor", 1, true);
+  g_pub_norm = nh.advertise<sensor_msgs::PointCloud2> ("Normals", 1, true);
   // g_pub_norm = nh.advertise<pcl::PointCloud<pcl::PointNormal>>("normal_pointcloud", 1);
   // g_pub_norm = nh.advertise<pcl::PointCloud<pcl::Normal>>("normal_pointcloud", 1);
   g_pub_pose = nh.advertise<geometry_msgs::PoseStamped> ("normal_pose", 5, true);
-  g_pub_cloud_centroid = nh.advertise<sensor_msgs::PointCloud2> ("centroid_cloud", 1, true);
+  // g_pub_cloud_centroid = nh.advertise<sensor_msgs::PointCloud2> ("centroid_cloud", 1, true);
   g_pub_plane = nh.advertise<sensor_msgs::PointCloud2> ("Plane", 1, true);
   g_pub_cloud_filtered2 = nh.advertise<sensor_msgs::PointCloud2> ("cloud_filtered2", 1, true);
   // g_pub_purple_red = nh.advertise<sensor_msgs::PointCloud2> ("purple_red_cubes", 1, true);
   // g_pub_crop_hull = nh.advertise<sensor_msgs::PointCloud2> ("crop_hull", 1, true);
-  // g_pub_point = nh.advertise<geometry_msgs::PointStamped> ("centroid", 5, true);
+  g_pub_point = nh.advertise<geometry_msgs::PointStamped> ("centroid", 5, true);
+  g_pub_normal_point = nh.advertise<geometry_msgs::PointStamped> ("normal_point1", 5, true);
   
 }
 
@@ -104,7 +106,7 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
 
 {
   /* Perform pick and place*/
-
+  moveHomePosition(g_home_postion);
   q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
 
   // determine the grasping orientation
@@ -119,30 +121,143 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
 
   moveArm(g_task2_pose);
 
-  ros::Duration(0.2).sleep();
+  // ros::Duration(1).sleep();
+  
+  // euclideanCluster(g_cloud_filtered_out_floor);
 
   findNormals(g_cloud_filtered_out_floor);
-
+  
+  ros::Duration(0.5).sleep();
+    
   segPlane(g_cloud_filtered_out_floor);
-
+  
+  ros::Duration(1).sleep();
+  
   std::cout << " Number of Normals " << g_cloud_normals2->points.size() << "\n";
-  std::cout << " Curvature " << g_cloud_normals2->points[1].curvature << "\n";
+  // std::cout << " Curvature " << g_cloud_normals2->points[1].curvature << "\n";
+
+  // find orientation
+
+  // geometry_msgs::PointStamped centroids;
+  ros::Duration(1).sleep();
+  Eigen::Vector4f centroid_in;
+  pcl::compute3DCentroid(*g_cloud_filtered_out_floor, centroid_in);
+
+  // centroids.header.frame_id = g_input_pc_frame_id_;
+  // centroids.header.stamp = ros::Time (0);
+  // centroids.point.x = centroid_in[0];
+  // centroids.point.y = centroid_in[1];
+  // centroids.point.z = centroid_in[2];
+
+  // tf::Vector3 axis_vector(g_coeff_plane->values[3], 
+  //             g_coeff_plane->values[4], g_coeff_plane->values[5]);
+
+
+  // tf2::Vector3 axis_vector(g_cloud_normals2->points[1].normal_x, 
+  //           g_cloud_normals2->points[1].normal_y, g_cloud_normals2->points[1].normal_z);
+
+  // tf2::Vector3 target(0.0, -1.0, 0.0);
+  // tf2::Vector3 right_vector = axis_vector.cross(target);
+  // right_vector.normalized();
+  // tf2::Quaternion q(right_vector, -1.0*acos(axis_vector.dot(target)));
+  
+  // q.normalize();
+  // geometry_msgs::Quaternion cube_orientation;
+  // tf2::quaternionTFToMsg(q, cube_orientation);
+
+
+
+  Eigen::Vector3d axis_vector(g_cloud_normals2->points[1].normal_x, 
+            g_cloud_normals2->points[1].normal_y, g_cloud_normals2->points[1].normal_z);
+
+  Eigen::Vector3d target(0.0, -1.0, 0.0);
+	Eigen::Quaternion<double> q_eigen;
+	q_eigen.setFromTwoVectors(axis_vector, target);
+  q_eigen.normalize();
+  // tf::Quaternion q;
+  // tf::quaternionEigenToTF (q_eigen, q);
+
+  geometry_msgs::Quaternion cube_orientation;
+  // tf::quaternionTFToMsg(q, cube_orientation);
+  // q_eigen = q_eigen.cast<double>();
+
+  cube_orientation = tf2::toMsg(q_eigen);
+
+  // SET ARM ORIENTATION
+
+  // define grasping as from above
+  // tf2::Quaternion q_x180deg(-1, 0, 0, 0);
+
+  // determine the grasping orientation
+
+  // tf2::Quaternion cube_orientation_tf;
+  // tf2::fromMsg(cube_orientation, cube_orientation_tf);
+
+  geometry_msgs::QuaternionStamped cube_orientation_stampeded;
+
+  cube_orientation_stampeded.header.frame_id = g_input_pc_frame_id_;
+  cube_orientation_stampeded.header.stamp = ros::Time (0);
+  cube_orientation_stampeded.quaternion = cube_orientation;
+
+  geometry_msgs::QuaternionStamped cube_orientation_stampeded_out;
+
+  try
+  {
+    g_listener_.transformQuaternion (g_target_frame,  
+                                cube_orientation_stampeded,
+                                cube_orientation_stampeded_out);
+    //ROS_INFO ("trying transform...");
+  }
+  catch (tf::TransformException& ex)
+  {
+    ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  }
+
+  tf2::Quaternion cube_orientation_tf;
+  tf2::fromMsg(cube_orientation_stampeded_out.quaternion, cube_orientation_tf);
+
+  tf2::Quaternion q_object;
+  q_object.setRPY(0, 0, 1);
+
+  tf2::Quaternion q_result = cube_orientation_tf * q_object;
+  geometry_msgs::Quaternion grasp_orientation2 = tf2::toMsg(q_result);
+
+  g_task2_pose.orientation = grasp_orientation2;
+
+
+  // PUBLISH NORMAL POSE?
 
   geometry_msgs::PoseStamped norm;
-  
+
+  // geometry_msgs::PointStamped norm;
+
   norm.header.frame_id = g_input_pc_frame_id_;
   norm.header.stamp = ros::Time (0);
 
-  norm.pose.position.x = g_cloud_normals2->points[1].normal_x;
-  norm.pose.position.y = g_cloud_normals2->points[1].normal_y;
-  norm.pose.position.z = g_cloud_normals2->points[1].normal_z;
+  // norm.pose.position.x = g_coeff_plane->values[0];
+  // norm.pose.position.y = g_coeff_plane->values[1];
+  // norm.pose.position.z = g_coeff_plane->values[2];
+  norm.pose.position.x = centroid_in[0];
+  norm.pose.position.y = centroid_in[1];
+  norm.pose.position.z = centroid_in[2];
+  // norm.pose.orientation = cube_orientation;
+  norm.pose.orientation = grasp_orientation2;
 
-  norm.pose.orientation.x = g_cloud_normals2->points[1].normal_x;
-  norm.pose.orientation.y = g_cloud_normals2->points[1].normal_y;
-  norm.pose.orientation.z = g_cloud_normals2->points[1].normal_z;
+  // norm.point.x = g_cloud_normals2->points[1].normal_x;
+  // norm.point.y = g_cloud_normals2->points[1].normal_y;
+  // norm.point.z = g_cloud_normals2->points[1].normal_z;
+
+  // norm.pose.position.x = g_cloud_normals2->points[1].normal_x;
+  // norm.pose.position.y = g_cloud_normals2->points[1].normal_y;
+  // norm.pose.position.z = g_cloud_normals2->points[1].normal_z;
+  // norm.pose.orientation.x = g_cloud_normals2->points[1].normal_x;
+  // norm.pose.orientation.y = g_cloud_normals2->points[1].normal_y;
+  // norm.pose.orientation.z = g_cloud_normals2->points[1].normal_z;
   // norm.pose.orientation.w = g_cloud_normals2->points[1].curvature;
 
   geometry_msgs::PoseStamped norm_msg_out;
+
+  // geometry_msgs::PointStamped norm_msg_out;
   try
   {
     g_listener_.transformPose (g_target_frame,  
@@ -157,8 +272,59 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
 
   g_pub_pose.publish(norm_msg_out);
 
-  pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered2);
+  
+  // moveArm(g_task2_pose);
+
+  // g_pub_normal_point.publish(norm_msg_out);
+
+  // ROS_INFO_STREAM ("normal_x: "
+  //                 << norm_msg_out.pose.position.x);
+  
+  // ROS_INFO_STREAM ("normal_y: "
+  //                 << norm_msg_out.pose.position.y);
+
+  // ROS_INFO_STREAM ("normal_z: "
+  //               << norm_msg_out.pose.position.z);                
+
+
+  // ROS_INFO_STREAM ("normal_x: "
+  //                 << norm_msg_out.point.x);
+  
+  // ROS_INFO_STREAM ("normal_y: "
+  //                 << norm_msg_out.point.y);
+
+  // ROS_INFO_STREAM ("normal_z: "
+  //               << norm_msg_out.point.z);    
+
+
+
   // moveHomePosition(g_home_postion);
+    // Visualise the normals
+
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Normal viewer"));
+	//viewer->initCameraParameters();// Set camera parameters , Enables you to view the point cloud from the default angle and direction 
+	// Set the background color 
+	viewer->setBackgroundColor(0.3, 0.3, 0.3);
+	viewer->addText("faxian", 10, 10, "text");
+	// Set the point cloud color 
+	pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color(g_cloud_filtered2, 0, 225, 0);
+	// Add coordinate system 
+	viewer->addCoordinateSystem(0.1);
+	viewer->addPointCloud<PointT>(g_cloud_filtered2, single_color, "sample cloud");
+	
+ 
+    // Add the point cloud normal to be displayed .cloud For the original point cloud model ,normal For normal information ,20 Indicates the point cloud interval to display the normal direction , That is, every 20 A point shows a normal ,0.02 Represents the normal length .
+	viewer->addPointCloudNormals<PointT, pcl::Normal>(g_cloud_filtered2, g_cloud_normals2, 20, 0.02, "normals");
+	// Set the point cloud size 
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "sample cloud");
+	while (!viewer->wasStopped())
+	{
+    
+		viewer->spinOnce(100);
+		boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+	}
+
+
 
   return free;
 }
@@ -647,7 +813,7 @@ CW3::colourFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   pcl_conversions::toPCL (*cloud_input_msg, g_pcl_pc);
   pcl::fromPCLPointCloud2 (g_pcl_pc, *g_rgb_cloud);
   applyVX (g_rgb_cloud, g_rgb_cloud);
-  // applyPT (g_rgb_cloud, g_rgb_cloud);
+  // applyPT (g_rgb_cloud, g_cloud_filtered_out_floor);
 
 
   // pcl::PackedRGBComparison<PointT>::Ptr
@@ -683,9 +849,10 @@ CW3::colourFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   // color_filter.filter(*g_cloud_filtered_rgb);
   
   // findNormals (g_rgb_cloud);
-  segFloor (g_rgb_cloud);
+  // segFloor (g_rgb_cloud);
+  segFloor(g_rgb_cloud, g_cloud_filtered_out_floor);
+  pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered_out_floor);
 
-  // pubFilteredPCMsg (g_pub_cloud_centroid, *g_cloud_plane);
 
   return;
 }
@@ -802,9 +969,16 @@ void
 CW3::applyPT (PointCPtr &in_cloud_ptr,
                       PointCPtr &out_cloud_ptr)
 {
+  geometry_msgs::PoseStamped current_z;
+  current_z = arm_group_.getCurrentPose();
+  double z_max;
+  z_max = current_z.pose.position.z;
+
   g_pt.setInputCloud (in_cloud_ptr);
-  g_pt.setFilterFieldName ("y"); // filter in y direction
-  g_pt.setFilterLimits (g_pt_thrs_min, g_pt_thrs_max);
+  // g_pt.setFilterFieldName ("y"); // filter in y direction
+  // g_pt.setFilterLimits (g_pt_thrs_min, g_pt_thrs_max);
+  g_pt.setFilterFieldName ("z"); // filter in y direction
+  g_pt.setFilterLimits (0, 0.65);
   g_pt.filter (*out_cloud_ptr);
   
   return;
@@ -894,7 +1068,9 @@ CW3::findNormals (PointCPtr &in_cloud_ptr)
 
 ////////////////////////////////////////////////////////////////////////////////
 void
-CW3::segFloor (PointCPtr &in_cloud_ptr)
+CW3::segFloor (PointCPtr &in_cloud_ptr,
+                PointCPtr &out_cloud_ptr)
+
 {
 
 
@@ -920,7 +1096,7 @@ CW3::segFloor (PointCPtr &in_cloud_ptr)
 
   // Remove the planar inliers, extract the rest
   g_extract_pc.setNegative (true);
-  g_extract_pc.filter (*g_cloud_filtered_out_floor);
+  g_extract_pc.filter (*out_cloud_ptr);
 
     // Create the segmentation object for the planar model
   // and set all the params
@@ -972,6 +1148,57 @@ CW3::segFloor (PointCPtr &in_cloud_ptr)
 
 }
 
+////////////////////////////////////////////////////////////////////////////////
+void
+CW3::removeFloor (PointCPtr &in_cloud_ptr,
+                PointCPtr &out_cloud_ptr)
+{
+
+  
+  geometry_msgs::PointStamped world;
+
+  double floor_x = 0;
+  double floor_y = 0;
+  double floor_z = 0.032;
+
+
+  world.header.frame_id = g_input_pc_frame_id_;
+  world.header.stamp = ros::Time (0);
+  world.point.x = floor_x;
+  world.point.y = floor_y;
+  world.point.z = floor_z;
+
+  geometry_msgs::PointStamped cam;
+
+  try
+  {
+    g_listener_.transformPoint (g_target_frame,  
+                                world,
+                                cam);
+    //ROS_INFO ("trying transform...");
+  }
+  catch (tf::TransformException& ex)
+  {
+    ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  }
+
+  floor_z = cam.point.z;
+
+  pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
+
+  
+  pcl::FieldComparison<PointT>::ConstPtr floor_z_ub (
+        new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LE, floor_z));
+
+  range_cond->addComparison(floor_z_ub);
+
+  floor_remove.setCondition(range_cond);
+  floor_remove.setInputCloud(in_cloud_ptr);
+  floor_remove.filter(*out_cloud_ptr);
+
+  return;
+
+}
 void
 CW3::segPlane (PointCPtr &in_cloud_ptr)
 {
@@ -1007,6 +1234,22 @@ CW3::segPlane (PointCPtr &in_cloud_ptr)
     // boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Normal viewer"));
   //ROS_INFO_STREAM ("Plane coefficients: " << *g_coeff_plane);
 
+  // auto plane_x = g_coeff_plane->values[0];
+  // auto plane_y = g_coeff_plane->values[1];
+  // auto plane_z = g_coeff_plane->values[2];
+  // auto plane_direction_x = g_coeff_plane->values[3];
+  // auto plane_direction_y = g_coeff_plane->values[4];
+  // auto plane_direction_z = g_coeff_plane->values[5];
+
+
+  // std::cout << " plane_x " << plane_x << "\n";
+  // std::cout << " plane_y " << plane_y << "\n";
+  // std::cout << " plane_z " << plane_z << "\n";
+  // std::cout << " plane_direction_x " << plane_direction_x << "\n";
+  // std::cout << " plane_direction_y " << plane_direction_y << "\n";
+  // std::cout << " plane_direction_z " << plane_direction_z << "\n";
+  // std::cout << " g_coeff_plane->values[6] " << g_coeff_plane->values[6] << "\n";
+
   ROS_INFO_STREAM ("in_cloud_ptr: "
                    << in_cloud_ptr->size ()
                    << " data points.");
@@ -1030,29 +1273,11 @@ CW3::segPlane (PointCPtr &in_cloud_ptr)
   pubFilteredPCMsg (g_pub_plane, *g_cloud_plane);
   pubFilteredPCMsg (g_pub_cloud_filtered2, *g_cloud_filtered2);
 
-  // pcl::visualization::PCLVisualizer viewer("PCL Viewer");
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Normal viewer"));
-	//viewer->initCameraParameters();// Set camera parameters , Enables you to view the point cloud from the default angle and direction 
-	// Set the background color 
-	viewer->setBackgroundColor(0.3, 0.3, 0.3);
-	viewer->addText("faxian", 10, 10, "text");
-	// Set the point cloud color 
-	pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color(in_cloud_ptr, 0, 225, 0);
-	// Add coordinate system 
-	viewer->addCoordinateSystem(0.1);
-	viewer->addPointCloud<PointT>(in_cloud_ptr, single_color, "sample cloud");
-	
- 
-    // Add the point cloud normal to be displayed .cloud For the original point cloud model ,normal For normal information ,20 Indicates the point cloud interval to display the normal direction , That is, every 20 A point shows a normal ,0.02 Represents the normal length .
-	viewer->addPointCloudNormals<PointT, pcl::Normal>(g_cloud_filtered2, g_cloud_normals2, 20, 0.02, "normals");
-	// Set the point cloud size 
-	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "sample cloud");
-	while (!viewer->wasStopped())
-	{
-    
-		viewer->spinOnce(100);
-		boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-	}
+  // sensor_msgs::PointCloud2 normals_out_msg;
+  // pcl::toROSMsg(*g_cloud_normals, normals_out_msg);
+
+  // g_pub_norm.publish(normals_out_msg);
+
 
 }
     
@@ -1171,6 +1396,16 @@ CW3::euclideanCluster (PointCPtr &in_cloud_ptr)
  
     g_centroid_list.push_back(cube_pt_msg_out);
     publishPose (cube_pt_msg_out);
+
+    ROS_INFO_STREAM ("centroid_x: "
+                  << cube_pt_msg_out.point.x);
+    
+    ROS_INFO_STREAM ("centroid_y: "
+                    << cube_pt_msg_out.point.y);
+
+    ROS_INFO_STREAM ("centroid_z: "
+                  << cube_pt_msg_out.point.z);    
+
 
 
   } ; 

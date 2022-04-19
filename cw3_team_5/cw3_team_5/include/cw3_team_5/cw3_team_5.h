@@ -50,6 +50,14 @@
 #include <tf2/LinearMath/Scalar.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_listener.h>
+#include <geometry_msgs/Transform.h>
+#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Wrench.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <tf2/convert.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 // PCL specific includes
 #include <pcl_conversions/pcl_conversions.h>
@@ -254,7 +262,12 @@ class CW3
     segPlane (PointCPtr &in_cloud_ptr);
 
     void
-    segFloor (PointCPtr &in_cloud_ptr);
+    segFloor (PointCPtr &in_cloud_ptr,
+                  PointCPtr &out_cloud_ptr);
+
+    void
+    removeFloor (PointCPtr &in_cloud_ptr,
+                  PointCPtr &out_cloud_ptr);
 
     /** \brief Point Cloud publisher.
       * 
@@ -366,7 +379,7 @@ class CW3
     ros::Publisher g_pub_pose;
             
     /** \brief ROS pose publishers. */
-    ros::Publisher g_pub_point;
+    ros::Publisher g_pub_point, g_pub_normal_point;
 
     /** \brief Point Cloud (filtered) pointer. */
     PointCPtr g_cloud_filtered, g_cloud_filtered2;
@@ -435,7 +448,7 @@ class CW3
         /** \brief cw1Q1: TF listener definition. */
     tf::TransformListener g_listener2_;
 
-    pcl::ConditionalRemoval<PointT> color_filter, color_filter_red_purple;
+    pcl::ConditionalRemoval<PointT> color_filter, color_filter_red_purple, floor_remove;
 
 
     /** \brief Point indices for rgb cloud. */
@@ -604,7 +617,7 @@ class CW3
     double g_k_nn = 50; // Normals nn size
     double seg_max_it = 150;
     double seg_dist_thres = 0.08;
-    double seg_dist_thres_plane = 0.01;
+    double seg_dist_thres_plane = 0.05; //0.01
     double seg_dist_weight = 0.1;
 
     /** \brief Parameters to define cartesian move */
@@ -635,9 +648,9 @@ class CW3
     double g_floor_centre_z = 0;
 
     /** \brief Parameters to define Euclidean Clustering */
-    double g_cluster_tolerance = 0.02;
-    double min_cluster_size = 2;
-    double max_cluster_size = 20;
+    double g_cluster_tolerance = 0.01; //0.02
+    double min_cluster_size = 5;
+    double max_cluster_size = 40;
 
     /** \brief Parameters to Crop Hull filter */
     double concave_hull_alpha = 20;
