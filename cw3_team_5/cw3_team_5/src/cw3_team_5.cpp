@@ -87,6 +87,7 @@ CW3::CW3(ros::NodeHandle &nh):
   // g_pub_norm = nh.advertise<pcl::PointCloud<pcl::PointNormal>>("normal_pointcloud", 1);
   // g_pub_norm = nh.advertise<pcl::PointCloud<pcl::Normal>>("normal_pointcloud", 1);
   g_pub_pose = nh.advertise<geometry_msgs::PoseStamped> ("normal_pose", 5, true);
+  g_pub_pose_test = nh.advertise<geometry_msgs::PoseStamped> ("test_pose", 5, true);
   // g_pub_cloud_centroid = nh.advertise<sensor_msgs::PointCloud2> ("centroid_cloud", 1, true);
   g_pub_plane = nh.advertise<sensor_msgs::PointCloud2> ("Plane", 1, true);
   g_pub_cloud_filtered2 = nh.advertise<sensor_msgs::PointCloud2> ("cloud_filtered2", 1, true);
@@ -143,89 +144,111 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
   Eigen::Vector4f centroid_in;
   pcl::compute3DCentroid(*g_cloud_filtered_out_floor, centroid_in);
 
-  // centroids.header.frame_id = g_input_pc_frame_id_;
-  // centroids.header.stamp = ros::Time (0);
-  // centroids.point.x = centroid_in[0];
-  // centroids.point.y = centroid_in[1];
-  // centroids.point.z = centroid_in[2];
 
-  // tf::Vector3 axis_vector(g_coeff_plane->values[3], 
-  //             g_coeff_plane->values[4], g_coeff_plane->values[5]);
-
-
-  // tf2::Vector3 axis_vector(g_cloud_normals2->points[1].normal_x, 
+  // Eigen::Vector3d axis_vector(g_cloud_normals2->points[1].normal_x, 
   //           g_cloud_normals2->points[1].normal_y, g_cloud_normals2->points[1].normal_z);
 
-  // tf2::Vector3 target(0.0, -1.0, 0.0);
-  // tf2::Vector3 right_vector = axis_vector.cross(target);
-  // right_vector.normalized();
-  // tf2::Quaternion q(right_vector, -1.0*acos(axis_vector.dot(target)));
-  
-  // q.normalize();
-  // geometry_msgs::Quaternion cube_orientation;
-  // tf2::quaternionTFToMsg(q, cube_orientation);
-
-
-
-  Eigen::Vector3d axis_vector(g_cloud_normals2->points[1].normal_x, 
-            g_cloud_normals2->points[1].normal_y, g_cloud_normals2->points[1].normal_z);
-
-  Eigen::Vector3d target(0.0, -1.0, 0.0);
+  Eigen::Vector3d axis_vector(0, 
+            0, g_cloud_normals2->points[1].normal_z);
+  Eigen::Vector3d target(-1.0, 0.0, 0.0);
 	Eigen::Quaternion<double> q_eigen;
 	q_eigen.setFromTwoVectors(axis_vector, target);
+
   q_eigen.normalize();
-  // tf::Quaternion q;
-  // tf::quaternionEigenToTF (q_eigen, q);
 
-  geometry_msgs::Quaternion cube_orientation;
-  // tf::quaternionTFToMsg(q, cube_orientation);
-  // q_eigen = q_eigen.cast<double>();
+  std::cout << q_eigen.x() << q_eigen.y() << q_eigen.z() << q_eigen.w() << std::endl;
 
-  cube_orientation = tf2::toMsg(q_eigen);
+  Eigen::Vector3d axis = axis_vector.cross(target);
+  axis.normalize();
+  double angle = acos(axis_vector.dot(target));
+  Eigen::AngleAxisd aa(angle,axis);
+  Eigen::Quaterniond quat(aa);
+  std::cout << quat.x() << quat.y() << quat.z() << quat.w() << std::endl;
 
-  // SET ARM ORIENTATION
+  tf2::Quaternion test;
+  test.setRPY(g_cloud_normals2->points[1].normal_x, 
+    g_cloud_normals2->points[1].normal_y, 0);
+  geometry_msgs::Quaternion testMsg;
+  testMsg = tf2::toMsg(test);
 
-  // define grasping as from above
-  // tf2::Quaternion q_x180deg(-1, 0, 0, 0);
-
-  // determine the grasping orientation
-
-  // tf2::Quaternion cube_orientation_tf;
-  // tf2::fromMsg(cube_orientation, cube_orientation_tf);
-
-  geometry_msgs::QuaternionStamped cube_orientation_stampeded;
-
-  cube_orientation_stampeded.header.frame_id = g_input_pc_frame_id_;
-  cube_orientation_stampeded.header.stamp = ros::Time (0);
-  cube_orientation_stampeded.quaternion = cube_orientation;
-
-  geometry_msgs::QuaternionStamped cube_orientation_stampeded_out;
+  geometry_msgs::PoseStamped testPose;
+  testPose.header.frame_id = g_input_pc_frame_id_;
+  testPose.header.stamp = ros::Time (0);
+  testPose.pose.position.x = centroid_in[0];
+  testPose.pose.position.y = centroid_in[1];
+  testPose.pose.position.z = centroid_in[2];
+  testPose.pose.orientation = testMsg;
+  geometry_msgs::PoseStamped testPoseOut;
 
   try
   {
-    g_listener_.transformQuaternion (g_target_frame,  
-                                cube_orientation_stampeded,
-                                cube_orientation_stampeded_out);
-    //ROS_INFO ("trying transform...");
+    g_listener_.transformPose (g_target_frame,  
+                                testPose,
+                                testPoseOut);
   }
   catch (tf::TransformException& ex)
   {
     ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
   }
 
+  g_pub_pose_test.publish(testPoseOut);
+
+
+  double angle_x = g_cloud_normals2->points[1].normal_x;
+  double angle_y = g_cloud_normals2->points[1].normal_x;
+  double angle_z = g_cloud_normals2->points[1].normal_x;
+
+  g_task1_angle = acos(angle_x/sqrt(pow(angle_x,2) + pow(angle_y,2) + pow(angle_z,2)));
+
+  std::cout << "andle from x-axis: " << g_task1_angle << std::endl;
+
+  geometry_msgs::Quaternion cube_orientation;
+  cube_orientation = tf2::toMsg(q_eigen);
+
+  // SET ARM ORIENTATION
+
+  // geometry_msgs::QuaternionStamped cube_orientation_stampeded;
+  // cube_orientation_stampeded.header.frame_id = g_input_pc_frame_id_;
+  // cube_orientation_stampeded.header.stamp = ros::Time (0);
+  // cube_orientation_stampeded.quaternion = cube_orientation;
+  // geometry_msgs::QuaternionStamped cube_orientation_stampeded_out;
+
+  // try
+  // {
+  //   g_listener_.transformQuaternion (g_target_frame,  
+  //                               cube_orientation_stampeded,
+  //                               cube_orientation_stampeded_out);
+  // }
+  // catch (tf::TransformException& ex)
+  // {
+  //   ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  // }
+
   tf2::Quaternion cube_orientation_tf;
-  tf2::fromMsg(cube_orientation_stampeded_out.quaternion, cube_orientation_tf);
+  // tf2::fromMsg(cube_orientation_stampeded_out.quaternion, cube_orientation_tf);
 
-  tf2::Quaternion q_object;
-  q_object.setRPY(0, 0, 1);
+  tf2::fromMsg(cube_orientation, cube_orientation_tf);
 
-  tf2::Quaternion q_result = cube_orientation_tf * q_object;
-  geometry_msgs::Quaternion grasp_orientation2 = tf2::toMsg(q_result);
+  tf2::Quaternion pick_orientation;
+  pick_orientation.setRPY(0,0,g_task1_angle);
+  tf2::Quaternion q_result2;
 
-  g_task2_pose.orientation = grasp_orientation2;
+  q_result2 = q_result*pick_orientation;
+  geometry_msgs::Quaternion grasp_orientation2 = tf2::toMsg(q_result2);
+  // tf2::Quaternion q_object;
+
+  // q_object.setRPY(3.14159, 0, 3.14159*2);
+
+  // tf2::Quaternion q_result = cube_orientation_tf *  norm.pose.position.y = centroid_in[1];
+
+  // geometry_msgs::Quaternion grasp_orientation2 = tf2::toMsg(q_result);
+  
 
 
-  // PUBLISH NORMAL POSE?
+  // cube_orientation_tf.x = 0;
+  // cube_orientation_tf.y = 0;
+  // cube_orientation_tf.normalize();
+  // g_task2_pose.orientation = cube_orientation_tf;  norm.pose.position.x = centroid_in[0];
 
   geometry_msgs::PoseStamped norm;
 
@@ -241,7 +264,10 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
   norm.pose.position.y = centroid_in[1];
   norm.pose.position.z = centroid_in[2];
   // norm.pose.orientation = cube_orientation;
-  norm.pose.orientation = grasp_orientation2;
+  norm.pose.orientation = cube_orientation;
+  // norm.pose.orientation = cube_orientation;
+  // norm.pose.orientation.x = 0;
+  // norm.pose.orientation.y = 0;
 
   // norm.point.x = g_cloud_normals2->points[1].normal_x;
   // norm.point.y = g_cloud_normals2->points[1].normal_y;
@@ -272,57 +298,65 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
 
   g_pub_pose.publish(norm_msg_out);
 
-  
+  // g_task2_pose.orientation = grasp_orientation2;
+  // g_task2_pose.orientation.x = 0;
+  // g_task2_pose.orientation.y = 0;
   // moveArm(g_task2_pose);
 
-  // g_pub_normal_point.publish(norm_msg_out);
+  geometry_msgs::PointStamped centroids_test;
 
-  // ROS_INFO_STREAM ("normal_x: "
-  //                 << norm_msg_out.pose.position.x);
-  
-  // ROS_INFO_STREAM ("normal_y: "
-  //                 << norm_msg_out.pose.position.y);
+  centroids_test.header.frame_id = g_input_pc_frame_id_;
+  centroids_test.header.stamp = ros::Time (0);
+  centroids_test.point.x = centroid_in[0];
+  centroids_test.point.y = centroid_in[1];
+  centroids_test.point.z = centroid_in[2];
 
-  // ROS_INFO_STREAM ("normal_z: "
-  //               << norm_msg_out.pose.position.z);                
+  // Transform the point to new frame
+    
+  geometry_msgs::PointStamped centroids_test_out;
+  try
+  {
+    g_listener_.transformPoint (g_target_frame,  
+                                centroids_test,
+                                centroids_test_out);
+    //ROS_INFO ("trying transform...");
+  }
+  catch (tf::TransformException& ex)
+  {
+    ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  }
 
+  geometry_msgs::Point object_location;
+  object_location = centroids_test_out.point;
 
-  // ROS_INFO_STREAM ("normal_x: "
-  //                 << norm_msg_out.point.x);
-  
-  // ROS_INFO_STREAM ("normal_y: "
-  //                 << norm_msg_out.point.y);
-
-  // ROS_INFO_STREAM ("normal_z: "
-  //               << norm_msg_out.point.z);    
-
+  pick(object_location, g_task1_angle);
 
 
   // moveHomePosition(g_home_postion);
     // Visualise the normals
 
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Normal viewer"));
-	//viewer->initCameraParameters();// Set camera parameters , Enables you to view the point cloud from the default angle and direction 
-	// Set the background color 
-	viewer->setBackgroundColor(0.3, 0.3, 0.3);
-	viewer->addText("faxian", 10, 10, "text");
-	// Set the point cloud color 
-	pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color(g_cloud_filtered2, 0, 225, 0);
-	// Add coordinate system 
-	viewer->addCoordinateSystem(0.1);
-	viewer->addPointCloud<PointT>(g_cloud_filtered2, single_color, "sample cloud");
+  // boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Normal viewer"));
+	// //viewer->initCameraParameters();// Set camera parameters , Enables you to view the point cloud from the default angle and direction 
+	// // Set the background color 
+	// viewer->setBackgroundColor(0.3, 0.3, 0.3);
+	// viewer->addText("faxian", 10, 10, "text");
+	// // Set the point cloud color 
+	// pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color(g_cloud_filtered2, 0, 225, 0);
+	// // Add coordinate system 
+	// viewer->addCoordinateSystem(0.1);
+	// viewer->addPointCloud<PointT>(g_cloud_filtered2, single_color, "sample cloud");
 	
  
-    // Add the point cloud normal to be displayed .cloud For the original point cloud model ,normal For normal information ,20 Indicates the point cloud interval to display the normal direction , That is, every 20 A point shows a normal ,0.02 Represents the normal length .
-	viewer->addPointCloudNormals<PointT, pcl::Normal>(g_cloud_filtered2, g_cloud_normals2, 20, 0.02, "normals");
-	// Set the point cloud size 
-	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "sample cloud");
-	while (!viewer->wasStopped())
-	{
+  //   // Add the point cloud normal to be displayed .cloud For the original point cloud model ,normal For normal information ,20 Indicates the point cloud interval to display the normal direction , That is, every 20 A point shows a normal ,0.02 Represents the normal length .
+	// viewer->addPointCloudNormals<PointT, pcl::Normal>(g_cloud_filtered2, g_cloud_normals2, 20, 0.02, "normals");
+	// // Set the point cloud size 
+	// viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "sample cloud");
+	// while (!viewer->wasStopped())
+	// {
     
-		viewer->spinOnce(100);
-		boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-	}
+	// 	viewer->spinOnce(100);
+	// 	boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+	// }
 
 
 
@@ -638,7 +672,7 @@ CW3::moveGripper(float width)
 ///////////////////////////////////////////////////////////////////////////////
 
 bool
-CW3::pick(geometry_msgs::Point position)
+CW3::pick(geometry_msgs::Point position, double angle)
 {
   /* This function picks up an object using a pose. The given point is where the
   centre of the gripper fingers will converge */
@@ -648,7 +682,12 @@ CW3::pick(geometry_msgs::Point position)
 
   // determine the grasping orientation
   q_object.setRPY(angle_offset1_, angle_offset1_, angle_offset_);
-  q_result = q_x180deg * q_object;
+  // q_result = q_x180deg * q_object;
+
+  tf2::Quaternion pick_angle;
+  pick_angle.setRPY(angle_offset1_, angle_offset1_, angle);
+
+  q_result = q_x180deg * q_object * pick_angle;
   grasp_orientation = tf2::toMsg(q_result);
 
   // set the desired grasping pose

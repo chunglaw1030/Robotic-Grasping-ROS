@@ -58,7 +58,7 @@
 #include <Eigen/Geometry>
 #include <tf2/convert.h>
 #include <tf2_eigen/tf2_eigen.h>
-
+#include<cmath>
 // PCL specific includes
 #include <pcl_conversions/pcl_conversions.h>
 //#include <pcl_ros/point_cloud.h>
@@ -156,7 +156,7 @@ class CW3
       * \input[in] position the xyz coordinates where the gripper converges
       */
     bool
-    pick(geometry_msgs::Point position);
+    pick(geometry_msgs::Point position, double angle);
 
     /** \brief MoveIt function for moving the move_group to the target position.
       *
@@ -376,7 +376,7 @@ class CW3
     geometry_msgs::PointStamped g_rpc_pt_msg;
     
     /** \brief ROS pose publishers. */
-    ros::Publisher g_pub_pose;
+    ros::Publisher g_pub_pose, g_pub_pose_test;
             
     /** \brief ROS pose publishers. */
     ros::Publisher g_pub_point, g_pub_normal_point;
@@ -541,6 +541,7 @@ class CW3
     double home_pose_ = 0;
     double box_centre_offset = 0.1;
 
+    double g_task1_angle;
     double g_task2_pose_x = 0.1;
     double g_task2_pose_y = 0;
     double g_task2_pose_z = 0.7;
