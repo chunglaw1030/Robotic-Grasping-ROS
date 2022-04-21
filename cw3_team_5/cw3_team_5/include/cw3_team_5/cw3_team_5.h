@@ -84,6 +84,7 @@
 #include <pcl/surface/convex_hull.h>
 #include <pcl/surface/concave_hull.h>
 #include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/segmentation/conditional_euclidean_clustering.h>
 
 // TF specific includes
 #include <tf/transform_broadcaster.h>
@@ -176,6 +177,9 @@ class CW3
     bool
     moveHomePosition(const std::vector< double > &group_variable_values);
 
+    bool
+    moveScanPosition(bool scan_front);
+
     /** \brief MoveIt function to perform a cartesian movement when picking cubes.
       *
       * \input[in] target pose to move the arm to
@@ -200,7 +204,7 @@ class CW3
       * \input[in] position, xyz coordinates of the box
       */
     bool
-    drop(geometry_msgs::Point position);
+    drop(geometry_msgs::Point position, double angle);
 
     /** \brief Filter out point cloud based on RGB values
       * 
@@ -309,6 +313,13 @@ class CW3
     void
     euclideanCluster (PointCPtr &in_cloud_ptr);
 
+    // void
+    // conditionalEuclideanCluster (PointCPtr &in_cloud_ptr);
+
+    // bool
+    // enforceIntensitySimilarity (const PointT& point_a, 
+    //   const PointT& point_b, float squared_distance );
+
     /** \brief Perform Euclidean Clustering to find clusters of 
     * red and purple cubes
     * 
@@ -333,7 +344,11 @@ class CW3
     void
     applyCropHull (PointCPtr &in_cloud_ptr);
 
-    
+    void
+    findCubeAngle (double x, double y, double z);
+
+    void
+    colourOfCloud (double r, double g, double b);
 
     /** \brief MoveIt interface to move groups to seperate the arm and the gripper,
       * these are defined in urdf. */
@@ -361,6 +376,8 @@ class CW3
 
     ros::Publisher g_pub_plane;
 
+    ros::Publisher g_pub_colour_filtered;
+
     ros::Publisher g_pub_cloud_filtered2;
 
     /** \brief ROS publishers. */
@@ -387,6 +404,9 @@ class CW3
     /** \brief Point Cloud (filtered) pointer. */
     PointCPtr g_cloud_filtered_out_floor, g_cloud_floor;
     
+    /** \brief Point Cloud (filtered) pointer. */
+    PointCPtr g_cloud_filtered_colour;
+
     /** \brief Point Cloud (filtered) sensros_msg for publ. */
     sensor_msgs::PointCloud2 g_cloud_filtered_msg, g_cloud_normal_msg;
     
@@ -462,6 +482,8 @@ class CW3
 
     /** \brief Point and dimensions defined for collision items. */
     geometry_msgs::Point g_floor_centre, g_cube_centre, g_box_centre, g_box_location;
+
+    geometry_msgs::Point g_stack_point_q2;
     
     geometry_msgs::Vector3 g_floor_dimensions, g_cube_dimensions, g_box_dimensions;
 
@@ -483,10 +505,12 @@ class CW3
     std_msgs::Float32 g_b;
 
     /** \brief Centroid list for task 2 and 3 */
-    std::list<geometry_msgs::PointStamped> g_centroid_list;
+    std::list<geometry_msgs::PointStamped> g_centroid_list, g_cec_centroid_list;
 
     /** \brief Centroid list of red and purple cubes */
     std::list<geometry_msgs::PointStamped> g_centroid_list2;
+
+    std::vector<std_msgs::ColorRGBA> g_colour_list_q2;
 
     /** \brief collision objects  */
     moveit_msgs::CollisionObject g_collision_object;
@@ -494,6 +518,7 @@ class CW3
     std::vector<moveit_msgs::CollisionObject> g_object_vector;
 
     /** \brief define robot poses for task 2 and 3 */
+    geometry_msgs::Pose g_scan_pose ;
     geometry_msgs::Pose g_task2_pose ;
     geometry_msgs::Pose g_task3_pose1 ;
     geometry_msgs::Pose g_task3_pose2 ;
@@ -520,36 +545,32 @@ class CW3
     double approach_distance_ = 0.18;
     double g_drop_distance_ = 0.14;
     double approach_box_ = 0.15;    // pcl::PackedRGBComparison<PointT>::Ptr
-    //   red_condition_lb, red_condition_ub;
 
-    // pcl::PackedRGBComparison<PointT>::Ptr
-    //   green_condition_lb, green_condition_ub;
-
-    // pcl::PackedRGBComparison<PointT>::Ptr
-    //   blue_condition_lb, blue_condition_ub;
-
-    // pcl::PackedHSIComparison<PointT>::Ptr
-    //   hue_condition_lb, hue_condition_ub;
-
-    // pcl::PackedRGBComparison<PointT>::Ptr
-    //   red_purple_r_lb, red_purple_r_ub;
-
-    // pcl::PackedRGBComparison<PointT>::Ptr
-    //   red_purple_g_lb, red_purple_g_ub;
-
-    // pcl::ConditionAnd<PointT>::Ptr g_color_cond, g_color_cond_red_purple;
     double home_pose_ = 0;
     double box_centre_offset = 0.1;
 
     double g_task1_angle;
-    double g_task2_pose_x = 0.1;
-    double g_task2_pose_y = 0;
-    double g_task2_pose_z = 0.7;
+    double g_scan_pose_x = 0.1;
+    double g_scan_pose_x2 = -0.1;
+    double g_scan_pose_y = 0;
+    double g_scan_pose_z = 0.7;
+
+    double g_task1_pose1_x = 0.38;
+    double g_task1_pose1_y = -0.09;
+    double g_task1_pose1_z = 0.2;
+
 
     double g_task3_pose1_x = 0.3;
     double g_task3_pose1_y = 0;
     double g_task3_pose1_z = 0.85;
     double g_task3_pose2_x = -0.3;
+
+    float g_stack_rotation;
+
+    // std_msgs::Float32 g_stack_rotation_q1;
+
+    float g_stack_rotation_q2;
+
 
     /** \brief Parameters to define RGB and hue values and tolerances */
 
@@ -586,8 +607,8 @@ class CW3
     double g_orange_g_value = 40;
     double g_orange_b_value = 10;
 
-    double g_yellow_r_value = 10;
-    double g_yellow_g_value = 10;
+    double g_yellow_r_value = 100;
+    double g_yellow_g_value = 100;
     double g_yellow_b_value = 0;
 
     double g_pink_r_value = 90;
@@ -602,9 +623,12 @@ class CW3
     double g_hue_blue = -84.7;
     double g_hue_purple = -42.3;
     double g_hue_red = 0.97;
+    double g_hue_orange = 21.2;
+    double g_hue_yellow = 42.3;
+    double g_hue_pink = -21.2;
 
     double g_rbg_tolerance = 5;
-    double g_hue_tolerance = 15;
+    double g_hue_tolerance = 10;
 
     double g_tile_r = 0;
     double g_tile_g = 60;
@@ -612,13 +636,13 @@ class CW3
 
 
     /** \brief Parameters to define voxel grid and pass through filters */
-    double g_vg_leaf_sz = 0.01; // VoxelGrid leaf size
+    double g_vg_leaf_sz = 0.01; // VoxelGrid leaf size 0.01
     double g_pt_thrs_min = -0.2; // PassThrough min thres
     double g_pt_thrs_max = 2.0; // PassThrough max thres
     double g_k_nn = 50; // Normals nn size
     double seg_max_it = 150;
     double seg_dist_thres = 0.08;
-    double seg_dist_thres_plane = 0.05; //0.01
+    double seg_dist_thres_plane = 0.005; //0.01
     double seg_dist_weight = 0.1;
 
     /** \brief Parameters to define cartesian move */
@@ -650,8 +674,8 @@ class CW3
 
     /** \brief Parameters to define Euclidean Clustering */
     double g_cluster_tolerance = 0.01; //0.02
-    double min_cluster_size = 5;
-    double max_cluster_size = 40;
+    double min_cluster_size = 2;
+    double max_cluster_size = 50;
 
     /** \brief Parameters to Crop Hull filter */
     double concave_hull_alpha = 20;
