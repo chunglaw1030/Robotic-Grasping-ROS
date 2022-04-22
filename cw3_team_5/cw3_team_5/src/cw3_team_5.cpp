@@ -104,24 +104,12 @@ CW3::CW3(ros::NodeHandle &nh):
 bool
 CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
   cw3_world_spawner::Task1Service::Response &response)
-
-
 {
   /* Perform pick and place*/
   moveHomePosition(g_home_postion);
-  q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
-
-  // determine the grasping orientation
-  q_object.setRPY(angle_offset2_, angle_offset2_, angle_offset_);
-  q_result = q_x180deg * q_object;
-  grasp_orientation = tf2::toMsg(q_result);
   
-  g_scan_pose.position.x = g_scan_pose_x;
-  g_scan_pose.position.y = g_scan_pose_y;
-  g_scan_pose.position.z = g_scan_pose_z;
-  g_scan_pose.orientation = grasp_orientation;
-
-  moveArm(g_scan_pose);
+  bool scan_front = true;
+  moveScanPosition(scan_front);
 
   ros::Duration(2).sleep();
   
@@ -172,14 +160,15 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
 
   g_pub_pose_test.publish(testPoseOut);
 
-  // Calculate angle of cubeg_stack_rotationg_stack_rotation << std::endl;
   double angle_x = g_cloud_normals2->points[1].normal_x;
   double angle_y = g_cloud_normals2->points[1].normal_y;
   double angle_z = g_cloud_normals2->points[1].normal_z;
 
   findCubeAngle (angle_x, angle_y, angle_z);
 
+  tf2::Quaternion q_object;
   q_object.setRPY(angle_offset1_, angle_offset1_, angle_offset_);
+  q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
   q_result = q_x180deg * q_object;
 
   tf2::Quaternion pick_orientation;
@@ -188,46 +177,217 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
   tf2::Quaternion q_result2;
   q_result2 = q_result*pick_orientation;
   geometry_msgs::Quaternion grasp_orientation2 = tf2::toMsg(q_result2);
-  geometry_msgs::Quaternion grasp_orientation3 = tf2::toMsg(q_result);
+  geometry_msgs::Quaternion neutral_orientation = tf2::toMsg(q_result);
 
   std::cout << "x: " << testPoseOut.pose.position.x  << std::endl;
   std::cout << "y: " << testPoseOut.pose.position.y  << std::endl;
   std::cout << "z: " << testPoseOut.pose.position.z  << std::endl;
 
-  geometry_msgs::Pose movepose2;
-  movepose2.position.x = testPoseOut.pose.position.x;
-  movepose2.position.y = testPoseOut.pose.position.y;
-  movepose2.position.z = 0.2;
-  // movepose2.position.x = g_task1_pose1_x;
-  // movepose2.position.y = g_task1_pose1_y;
-  // movepose2.position.z = g_task1_pose1_z;
-  movepose2.orientation = grasp_orientation2;
+  // tf2::Quaternion q_object;
+  // q_object.setRPY(angle_offset1_, angle_offset1_, angle_offset_);
+  // q_result = q_x180deg * q_object;
+  // grasp_orientation = tf2::toMsg(q_result);
 
-  moveArm(movepose2);
+  // /////////////moving cubes away to find colour /////////////////////////
+
+  // geometry_msgs::Pose movepose2;
+  // movepose2.position.x = testPoseOut.pose.position.x;
+  // movepose2.position.y = testPoseOut.pose.position.y;
+  // movepose2.position.z = 0.6;
+  // // movepose2.position.x = g_task1_pose1_x;
+  // // movepose2.position.y = g_task1_pose1_y;
+  // // movepose2.position.z = g_task1_pose1_z;
+  // movepose2.orientation = neutral_orientation;
+
+  // moveArm(movepose2);
+
+  // geometry_msgs::Pose random_pose;
+  // random_pose.position.x = -0.2;
+  // random_pose.position.y = -0.2;
+  // random_pose.position.z = 0.4;
+  // random_pose.orientation = neutral_orientation;
+
+  // geometry_msgs::Point random_point;
+  // random_point.x = -0.2;
+  // random_point.y = -0.2;
+  // random_point.z = 0.4;
+
+  // for (int i=0; i<6; i++ )
+  // {
+  //   Eigen::Vector4f centroid2;
+  //   pcl::compute3DCentroid(*g_cloud_filtered_out_floor, centroid2);
+
+  //   geometry_msgs::PointStamped cube_location;
+  //   cube_location.header.frame_id = g_input_pc_frame_id_;
+  //   cube_location.header.stamp = ros::Time (0);
+  //   cube_location.point.x = centroid2[0];
+  //   cube_location.point.y = centroid2[1];
+  //   cube_location.point.z = centroid2[2];
+  //   // cube_location.point.z = 0.25;
+  //   geometry_msgs::PointStamped cube_location_out;
+
+  //   try
+  //   {
+  //     g_listener_.transformPoint (g_target_frame,  
+  //                                 cube_location,
+  //                                 cube_location_out);
+  //   }
+  //   catch (tf::TransformException& ex)
+  //   {
+  //     ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
+  //   }
+
+  //   std_msgs::ColorRGBA cube_colour;
+  //   cube_colour.r = g_cloud_filtered_out_floor->points[0].r;
+  //   cube_colour.g = g_cloud_filtered_out_floor->points[0].g;
+  //   cube_colour.b = g_cloud_filtered_out_floor->points[0].b;
+
+  //   response.stack_colours.insert(response.stack_colours.begin(), cube_colour);
+    
+  //   std::cout << "x: " << cube_location_out.point.x << std::endl;
+  //   std::cout << "y: " << cube_location_out.point.y << std::endl;
+  //   std::cout << "z: " << cube_location_out.point.z << std::endl;
+  //   std::cout << "r: "<< cube_colour.r << " g: "<< cube_colour.g << " b: " << cube_colour.b <<  std::endl;
+
+  //   pick(cube_location_out.point, 0); //g_stack_rotation
+
+  //   moveArm(random_pose);
+
+  //   drop(random_point, 0);
+
+  //   moveArm(movepose2);
+
+  // }
+
+  // /////////////End of moving cubes away //////////////////////
+
+  //////////////// Using Color filter ///////////////////////////
 
 
-  // moveHomePosition(g_home_postion);
-    // Visualise the normals
+  std::multimap< std::string, double, std::greater<> > mmapOfColour;
+  //// start with blue
+  g_r.data = g_blue_r_value;
+  g_g.data = g_blue_g_value;
+  g_b.data = g_blue_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  while (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      mmapOfColour.insert(std::pair<std::string, double>("blue", z_value));
+    }
+    euclideanCluster (g_cloud_filtered_rgb);
+    ros::Duration(0.2).sleep();
+  }
 
-  // boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Normal viewer"));
-	// //viewer->initCameraParameters();// Set camera parameters , Enables you to view the point cloud from the default angle and direction 
-	// // Set the background color 
-	// viewer->setBackgroundColor(0.3, 0.3, 0.3);
-	// viewer->addText("faxian", 10, 10, "text");
-	// // Set the point cloud color g_required_colour
-	// viewer->addPointCloud<PointT>(g_cloud_filtered2, single_color, "sample cloud");
-	
- 
-  //   // Add the point cloud normal to be displayed .cloud For the original point cloud model ,normal For normal information ,20 Indicates the point cloud interval to display the normal direction , That is, every 20 A point shows a normal ,0.02 Represents the normal length .
-	// viewer->addPointCloudNormals<PointT, pcl::Normal>(g_cloud_filtered2, g_cloud_normals2, 20, 0.02, "normals");
-	// // Set the point cloud size 
-	// viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "sample cloud");
-	// while (!viewer->wasStopped())
-	// {  
-	// 	viewer->spinOnce(100);
-	// 	boost::this_thread::sleep(boost::posix_timeg_required_colour
+  g_r.data = g_purple_r_value;
+  g_g.data = g_purple_g_value;
+  g_b.data = g_purple_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  while (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      mmapOfColour.insert(std::pair<std::string, double>("purple", z_value));
+    }
+    euclideanCluster (g_cloud_filtered_rgb);
+    ros::Duration(0.2).sleep();
+  }
 
-  response.stack_rotation = g_stack_rotation;
+  g_r.data = g_red_r_value;
+  g_g.data = g_red_g_value;
+  g_b.data = g_red_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  while (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      mmapOfColour.insert(std::pair<std::string, double>("red", z_value));
+    }
+    euclideanCluster (g_cloud_filtered_rgb);
+    ros::Duration(0.2).sleep();
+  }
+
+  g_r.data = g_orange_r_value;
+  g_g.data = g_orange_g_value;
+  g_b.data = g_orange_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  while (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      mmapOfColour.insert(std::pair<std::string, double>("orange", z_value));
+    }
+    euclideanCluster (g_cloud_filtered_rgb);
+    ros::Duration(0.2).sleep();
+  }
+
+  g_r.data = g_yellow_r_value;
+  g_g.data = g_yellow_g_value;
+  g_b.data = g_yellow_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  while (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      mmapOfColour.insert(std::pair<std::string, double>("yellow", z_value));
+    }
+    euclideanCluster (g_cloud_filtered_rgb);
+    ros::Duration(0.2).sleep();
+  }
+
+  g_r.data = g_pink_r_value;
+  g_g.data = g_pink_g_value;
+  g_b.data = g_pink_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  while (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      mmapOfColour.insert(std::pair<std::string, double>("pink", z_value));
+    }
+    euclideanCluster (g_cloud_filtered_rgb);
+    ros::Duration(0.2).sleep();
+  }
+
+  for (std::multimap<std::string, double>::iterator it = mmapOfColour.begin();
+          it != mmapOfColour.end(); it++)
+      std::cout << it->first << " :: " << it->second << std::endl;
+
+  response.stack_rotation = (float) g_stack_rotation;
 
   return free;
 }
@@ -239,50 +399,81 @@ CW3::task2Callback(cw3_world_spawner::Task2Service::Request &request,
   cw3_world_spawner::Task2Service::Response &response)
 
 { 
+  moveHomePosition(g_home_postion);
   g_colour_list_q2 =  request.stack_colours; //std::vector<std_msgs::ColorRGBA>
   g_stack_point_q2 =  request.stack_point; //geometry_msgs::Point
   g_stack_rotation_q2 = request.stack_rotation; // float
 
-
+  int k = 0; 
   for (auto i: g_colour_list_q2)
   {
     g_r.data = i.r * g_rgb_convert;
     g_g.data = i.g * g_rgb_convert;
     g_b.data = i.b * g_rgb_convert;
+    colourOfCloud(g_r.data, g_g.data, g_b.data);
 
     bool scan_front = true;
     moveScanPosition(scan_front);
 
-    colourOfCloud(g_r.data, g_g.data, g_b.data);
-
-
-    ros::Duration(1.2).sleep();
-
+    
     euclideanCluster (g_cloud_filtered_colour);
 
-    findNormals(g_cloud_filtered_colour);
+    g_box_orientation.x = g_box_orientation_x;
+    g_box_orientation.y = g_box_orientation_y;
+    g_box_orientation.z = g_box_orientation_z;
+    g_box_orientation.w = g_box_orientation_w;
 
-    ros::Duration(1.2).sleep();
+    g_cube_dimensions.x = g_cube_dimensions_x;
+    g_cube_dimensions.y = g_cube_dimensions_y;
+    g_cube_dimensions.z = g_cube_dimensions_y;
 
-    double angle_x = g_cloud_normals->points[0].normal_x;
-    double angle_y = g_cloud_normals->points[0].normal_y;
-    double angle_z = g_cloud_normals->points[0].normal_z;
+    for (auto i: g_centroid_list2)
+    {  
+      g_cube_centre.x = i.point.x ;
+      g_cube_centre.y = i.point.y ;
+      g_cube_centre.z = i.point.z ;
+      
+      addCollisionObject(g_cube, g_cube_centre, g_cube_dimensions,
+      g_box_orientation);
+    }
 
-    findCubeAngle (angle_x, angle_y, angle_z);
+    // findNormals(g_cloud_filtered_colour);
 
-    ros::Duration(1.2).sleep();
+    // ros::Duration(1.2).sleep();
+    // std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // double angle_x = g_cloud_normals->points[0].normal_x;
+    // double angle_y = g_cloud_normals->points[0].normal_y;
+    // double angle_z = g_cloud_normals->points[0].normal_z;
+
+    // findCubeAngle (angle_x, angle_y, angle_z);
+
+    // ros::Duration(1.2).sleep();
+    // std::this_thread::sleep_for(std::chrono::seconds(1));
 
     geometry_msgs::Point object_location;
     object_location = g_centroid_list.front().point;
     
-    pick(object_location, g_stack_rotation);
+    ROS_INFO_STREAM ("centroid_x: "
+                  << object_location.x);
+    
+    ROS_INFO_STREAM ("centroid_y: "
+                    << object_location.y);
 
-    drop(g_stack_point_q2, g_stack_rotation_q2);
+    ROS_INFO_STREAM ("centroid_z: "
+                  << object_location.z);    
 
+    pick(object_location, 0); //g_stack_rotation
+
+    g_stack_point_q2.z = g_stack_point_q2.z + k*0.04;
+
+    drop(g_stack_point_q2, (double) g_stack_rotation_q2);
+
+    k += 1;
 
   } 
 
-
+  moveHomePosition(g_home_postion);
 
   
   // for (auto i: g_centroid_list)
@@ -459,18 +650,25 @@ CW3::moveScanPosition(bool scan_front)
   q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
 
   // determine the grasping orientation
-  q_object.setRPY(angle_offset2_, angle_offset2_, angle_offset_);
+  // q_object.setRPY(3.14159 / 18.0, 3.14159 / 18.0, angle_offset_);
+  tf2::Quaternion q_object;
+  // q_object.setRPY(angle_offset2_, angle_offset2_, angle_offset_);
+  q_object.setRPY(3.14159 / 10.0, -3.14159 / 10.0, angle_offset_);
   q_result = q_x180deg * q_object;
-  grasp_orientation = tf2::toMsg(q_result);
+  geometry_msgs::Quaternion scan_orientation;
+  scan_orientation = tf2::toMsg(q_result);
   
   if (scan_front == true)
-    g_scan_pose.position.x = g_scan_pose_x;
+    // g_scan_pose.position.x = g_scan_pose_x;
+    g_scan_pose.position.x = 0.35;
   else if (scan_front == false)
+    // g_scan_pose.position.x = g_scan_pose_x2;
     g_scan_pose.position.x = g_scan_pose_x2;
 
-  g_scan_pose.position.y = g_scan_pose_y;
+  // g_scan_pose.position.y = g_scan_pose_y;
+  g_scan_pose.position.y = -0.45;
   g_scan_pose.position.z = g_scan_pose_z;
-  g_scan_pose.orientation = grasp_orientation;
+  g_scan_pose.orientation = scan_orientation;
 
   moveArm(g_scan_pose);
 
@@ -486,8 +684,8 @@ CW3::moveArm(geometry_msgs::Pose target_pose)
   // setup the target pose
   ROS_INFO("Setting pose target");
   arm_group_.setPoseTarget(target_pose);
-  arm_group_.setPlanningTime(10);
-  arm_group_.setGoalTolerance(0.05);
+  // arm_group_.setPlanningTime(10);
+  // arm_group_.setGoalTolerance(0.1);
   // create a movement plan for the arm
   ROS_INFO("Attempting to plan the path");
   moveit::planning_interface::MoveGroupInterface::Plan my_plan;
@@ -571,20 +769,22 @@ CW3::pick(geometry_msgs::Point position, double angle)
   q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
 
   // determine the grasping orientation
+  tf2::Quaternion q_object;
   q_object.setRPY(angle_offset1_, angle_offset1_, angle_offset_ + angle);
   // q_result = q_x180deg * q_object;
 
-  tf2::Quaternion pick_angle;
-  pick_angle.setRPY(angle_offset1_, angle_offset1_, angle);
+  // tf2::Quaternion pick_angle;
+  // pick_angle.setRPY(angle_offset1_, angle_offset1_, angle);
 
-  q_result = q_x180deg * q_object * pick_angle;
-  // q_result = q_x180deg * q_object ;
-  grasp_orientation = tf2::toMsg(q_result);
+  // q_result = q_x180deg * q_object * pick_angle;
+  geometry_msgs::Quaternion pick_orientation;
+  q_result = q_x180deg * q_object ;
+  pick_orientation = tf2::toMsg(q_result);
 
   // set the desired grasping pose
   geometry_msgs::Pose grasp_pose;
   grasp_pose.position = position;
-  grasp_pose.orientation = grasp_orientation;
+  grasp_pose.orientation = pick_orientation;
   grasp_pose.position.z += g_pick_offset_;
 
   // set the desired pre-grasping pose
@@ -627,7 +827,7 @@ CW3::pick(geometry_msgs::Point position, double angle)
   }
 
   // grasp!
-  success *= moveGripper(gripper_closed_);
+  success *= moveGripper(0.0); //gripper_closed_
 
   if (not success) 
   {
@@ -661,19 +861,21 @@ CW3::drop(geometry_msgs::Point position, double angle)
   q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
 
   // determine the grasping orientation
-  q_object.setRPY(angle_offset1_, angle_offset1_, angle_offset_);
+  tf2::Quaternion q_object;
+  q_object.setRPY(angle_offset1_, angle_offset1_, angle_offset_ + angle);
   
-  tf2::Quaternion pick_angle;
-  pick_angle.setRPY(angle_offset1_, angle_offset1_, angle);
+  // tf2::Quaternion pick_angle;
+  // pick_angle.setRPY(angle_offset1_, angle_offset1_, angle);
 
-  q_result = q_x180deg * q_object * pick_angle;
-  // q_result = q_x180deg * q_object;
-  grasp_orientation = tf2::toMsg(q_result);
+  // q_result = q_x180deg * q_object * pick_angle;
+  geometry_msgs::Quaternion drop_orientation;
+  q_result = q_x180deg * q_object;
+  drop_orientation = tf2::toMsg(q_result);
 
   // set the desired pose to drop cube
   geometry_msgs::Pose drop_pose;
   drop_pose.position = position;
-  drop_pose.orientation = grasp_orientation;
+  drop_pose.orientation = drop_orientation;
   drop_pose.position.z += g_drop_distance_;
 
   // set the desired pose to approach top of box
@@ -748,6 +950,7 @@ CW3::colourFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   pcl_conversions::toPCL (*cloud_input_msg, g_pcl_pc);
   pcl::fromPCLPointCloud2 (g_pcl_pc, *g_rgb_cloud);
   applyVX (g_rgb_cloud, g_rgb_cloud);
+  applyPT (g_rgb_cloud, g_rgb_cloud);
   // applyPT (g_rgb_cloud, g_cloud_filtered_out_floor);
 
   segFloor(g_rgb_cloud, g_cloud_filtered_out_floor);
@@ -785,7 +988,6 @@ CW3::colourFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   color_filter.filter(*g_cloud_filtered_colour); // task 2
   
   // findNormals (g_rgb_cloud);
-  // segFloor (g_rgb_cloud);
   
   pubFilteredPCMsg (g_pub_cloud, *g_cloud_filtered_out_floor);
   
@@ -806,116 +1008,18 @@ CW3::applyVX (PointCPtr &in_cloud_ptr,
   return;
 }
 
-void
-CW3::applyCropHull (PointCPtr &in_cloud_ptr)
-{
-  // pcl::CropHull<pcl::PointXYZ> cropHullFilter;
-  // boost::shared_ptr<PointCloud> hullCloud(new PointCloud());
-  // boost::shared_ptr<PointCloud> hullPoints(new PointCloud());
-  // std::vector<Vertices> hullPolygons;
-
-  // THIS IS NOT USED
-
-
-  PointT p1;
-  p1.x = -g_box_location.x + box_centre_offset;
-  p1.y = g_box_location.y - box_centre_offset;
-  p1.z = g_box_location.z ;
-  // hullCloud->push_back(p1);  }
-
-  PointT p2;
-  p2.x = -g_box_location.x + box_centre_offset;
-  p2.y = g_box_location.y + box_centre_offset;
-  p2.z = g_box_location.z ;
-  // hullCloud->push_back(p);
-
-  PointT p3;
-  p3.x = -g_box_location.x - box_centre_offset;
-  p3.y = g_box_location.y - box_centre_offset;
-  p3.z = g_box_location.z ;
-  // hullCloud->push_back(p);
-
-  PointT p4;
-  p4.x = -g_box_location.x - box_centre_offset;
-  p4.y = g_box_location.y + box_centre_offset;
-  p4.z = g_box_location.z ;
-  // hullCloud->push_back(p);
-
-  PointT p5;
-  p5.x = -g_box_location.x + box_centre_offset;
-  p5.y = g_box_location.y - box_centre_offset;
-  p5.z = g_box_location.z - 2*box_centre_offset;
-  // hullCloud->push_back(p1);
-
-  PointT p6;
-  p6.x = -g_box_location.x + box_centre_offset;
-  p6.y = g_box_location.y + box_centre_offset;
-  p6.z = g_box_location.z - 2*box_centre_offset;
-  // hullCloud->push_back(p);
-
-  PointT p7;
-  p7.x = -g_box_location.x - box_centre_offset;
-  p7.y = g_box_location.y - box_centre_offset;
-  p7.z = g_box_location.z - 2*box_centre_offset;
-  // hullCloud->push_back(p);
-
-  PointT p8;
-  p8.x = -g_box_location.x - box_centre_offset;
-  p8.y = g_box_location.y + box_centre_offset;
-  p8.z = g_box_location.z - 2*box_centre_offset;
-  // hullCloud->push_back(p);
-
-
-  pcl::PointCloud<PointT>::Ptr boundingbox_ptr (new PointC);//Used to store the boundary points
-
-  pcl::PointCloud<PointT>::Ptr hull(new PointC);
-  
-  boundingbox_ptr->push_back(p1);
-  boundingbox_ptr->push_back(p2);
-  boundingbox_ptr->push_back(p3);
-  boundingbox_ptr->push_back(p4);
-  boundingbox_ptr->push_back(p5);
-  boundingbox_ptr->push_back(p6);
-  boundingbox_ptr->push_back(p7);
-  boundingbox_ptr->push_back(p8);
-
-  pcl::ConcaveHull<PointT> hull_calculator;
-  std::vector<pcl::Vertices> polygons;
-
-  hull_calculator.setInputCloud (boundingbox_ptr);
-  hull_calculator.setAlpha (concave_hull_alpha);
-  hull_calculator.reconstruct (*hull, polygons);
-  int dim = hull_calculator.getDimension ();
-
-// Crop Hull
-  // CropHull<pcl::PointXYZ> crop_filter;
-  g_crop_hull.setInputCloud (in_cloud_ptr);
-  g_crop_hull.setHullCloud (hull);
-  g_crop_hull.setHullIndices (polygons);
-  g_crop_hull.setDim (dim);
-  g_crop_hull.setCropOutside (false);
-  g_crop_hull.filter (*g_cloud_crop_hull);
-
-  pubFilteredPCMsg (g_pub_crop_hull, *g_cloud_crop_hull);
-  
-  return;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 void
 CW3::applyPT (PointCPtr &in_cloud_ptr,
                       PointCPtr &out_cloud_ptr)
 {
-  geometry_msgs::PoseStamped current_z;
-  current_z = arm_group_.getCurrentPose();
-  double z_max;
-  z_max = current_z.pose.position.z;
 
   g_pt.setInputCloud (in_cloud_ptr);
-  // g_pt.setFilterFieldName ("y"); // filter in y direction
+  g_pt.setFilterFieldName ("y"); // filter in y direction
   // g_pt.setFilterLimits (g_pt_thrs_min, g_pt_thrs_max);
-  g_pt.setFilterFieldName ("z"); // filter in y direction
-  g_pt.setFilterLimits (0, 0.65);
+  g_pt.setFilterLimits (g_pt_thrs_min, g_pt_thrs_max);
+  // g_pt.setFilterFieldName ("z"); // filter in y direction
+  // g_pt.setFilterLimits (0, 0.65);
   g_pt.filter (*out_cloud_ptr);
   
   return;
@@ -1020,7 +1124,7 @@ CW3::segFloor (PointCPtr &in_cloud_ptr,
   // Mandatory
   seg.setModelType (pcl::SACMODEL_PLANE);
   seg.setMethodType (pcl::SAC_RANSAC);
-  seg.setDistanceThreshold (0.018);
+  seg.setDistanceThreshold (0.03);
   seg.setInputCloud (in_cloud_ptr);
   seg.segment (*inliers, *coefficients);
 
@@ -1331,47 +1435,6 @@ CW3::euclideanCluster (PointCPtr &in_cloud_ptr)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// void
-// CW3::conditionalEuclideanCluster (PointCPtr &in_cloud_ptr)
-
-// {
-//   // pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
-//   g_tree_cluster_ptr->setInputCloud (in_cloud_ptr);
-//   pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters);
-//   pcl::ConditionalEuclideanClustering<PointT> cec (true);
-//   cec.setClusterTolerance (g_cluster_tolerance); // 2cm
-//   cec.setMinClusterSize (min_cluster_size);
-//   cec.setMaxClusterSize (max_cluster_size);
-//   cec.setInputCloud (in_cloud_ptr);
-//   cec.setConditionFunction (&CW3::enforceIntensitySimilarity);
-//   cec.segment (*clusters);
-  
-  
-//   // pcl::PointCloud<PointT>::Ptr cloud_cluster (new PointC);
-//   std::cout << "number of cluseters: " << clusters->size ()  << std::endl;
-//   // for (int i = 0; i < clusters->size (); ++i)
-//   // {
-//   //   int label = rand () % 8;
-//   //   for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
-//   //     (*cloud_out)[(*clusters)[i].indices[j]].intensity = label;
-//   // }
-
-//   // return;
-
-// }
-
-// bool
-// CW3::enforceIntensitySimilarity (const PointT& point_a, 
-//       const PointT& point_b, float squared_distance)
-// {
-//   if (std::abs (point_a.r - point_b.r) < 5.0f && 
-//     std::abs (point_a.g - point_b.g) < 5.0f &&
-//     std::abs (point_a.b - point_b.b) < 5.0f)
-
-//     return (true);
-//   else
-//     return (false);
-// }
 
 void
 CW3::addCollisionObject(std::string object_name,
@@ -1410,100 +1473,6 @@ CW3::addCollisionObject(std::string object_name,
   return;
 }
 
-void
-CW3::filterPurpleRedCubes(PointCPtr &in_cloud_ptr)
-{
-  pcl::PackedRGBComparison<PointT>::Ptr
-    red_purple_r_lb(new pcl::PackedRGBComparison<PointT>("r", pcl::ComparisonOps::GE, g_red_purple_cube_r-g_rbg_tolerance));
-  pcl::PackedRGBComparison<PointT>::Ptr
-    red_purple_r_ub(new pcl::PackedRGBComparison<PointT>("r", pcl::ComparisonOps::LE, g_red_purple_cube_r+g_rbg_tolerance));
-  pcl::PackedRGBComparison<PointT>::Ptr
-    red_purple_g_lb(new pcl::PackedRGBComparison<PointT>("g", pcl::ComparisonOps::GE, g_red_purple_cube_g-g_rbg_tolerance));
-  pcl::PackedRGBComparison<PointT>::Ptr
-    red_purple_g_ub(new pcl::PackedRGBComparison<PointT>("g", pcl::ComparisonOps::LE, g_red_purple_cube_g+g_rbg_tolerance));
-
-  pcl::ConditionAnd<PointT>::Ptr color_cond_red_purple (new pcl::ConditionAnd<PointT> ());
-  color_cond_red_purple->addComparison (red_purple_r_lb);
-  color_cond_red_purple->addComparison (red_purple_r_ub);
-  color_cond_red_purple->addComparison (red_purple_g_lb);
-  color_cond_red_purple->addComparison (red_purple_g_ub);
-
-  // Build the filter
-  color_filter_red_purple.setInputCloud(in_cloud_ptr);
-  color_filter_red_purple.setCondition (color_cond_red_purple);
-  color_filter_red_purple.filter(*g_red_purple_cube_cloud);
-
-  pubFilteredPCMsg (g_pub_purple_red, *g_red_purple_cube_cloud);
-
-  return;
-}
-
-void
-CW3::redPurpleCluster (PointCPtr &in_cloud_ptr)
-
-{
-  pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
-  tree->setInputCloud (in_cloud_ptr);
-  std::vector<pcl::PointIndices> cluster_indices;
-  pcl::EuclideanClusterExtraction<PointT> ec;
-  ec.setClusterTolerance (g_cluster_tolerance); // 2cm
-  ec.setMinClusterSize (min_cluster_size);
-  ec.setMaxClusterSize (max_cluster_size);
-  ec.setSearchMethod (tree);
-  ec.setInputCloud (in_cloud_ptr);
-  ec.extract (cluster_indices);
-  
-  g_centroid_list2.clear();
-  int j = 1;
-  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
-  {
-    pcl::PointCloud<PointT>::Ptr cloud_cluster2 (new PointC);
-    for (const auto& idx : it->indices)
-      cloud_cluster2->push_back ((*in_cloud_ptr)[idx]); //*
-    cloud_cluster2->width = cloud_cluster2->size ();
-    cloud_cluster2->height = 1;
-    cloud_cluster2->is_dense = true;
-
-    std::cout << "Red/Purple cluster " << j << "\n";
-    std::cout << "PointCloud representing the Cluster: " << cloud_cluster2->size () << " data points.\n" << std::endl;
-
-    j++;
-
-    geometry_msgs::PointStamped centroids_rpc;
-    Eigen::Vector4f centroid_in;
-    pcl::compute3DCentroid(*cloud_cluster2, centroid_in);
-
-    // centroids_rpc.header.frame_id = g_input_pc_frame_id_;
-    centroids_rpc.header.stamp = ros::Time (0);
-    // centroids.point = j;
-    centroids_rpc.point.x = centroid_in[0];
-    centroids_rpc.point.y = centroid_in[1];
-    centroids_rpc.point.z = centroid_in[2];
-
-    geometry_msgs::PointStamped g_rpc_pt_msg;
-    try
-    {
-      g_listener2_.transformPoint (base_frame_,  
-                                  centroids_rpc,
-                                  g_rpc_pt_msg);
-      //ROS_INFO ("trying transform...");
-    }
-    catch (tf::TransformException& ex)
-    {
-      ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
-    }
- 
-    g_centroid_list2.push_back(g_rpc_pt_msg);
-
-  }; 
-
-  for (auto i: g_centroid_list2)
-
-    std::cout << 'Non target cubes centroid list: \n' << i ;
-
-  return;
-
-}
 
 void 
 CW3::addCollisionItems (geometry_msgs::Point &goal_location)
@@ -1528,7 +1497,7 @@ CW3::addCollisionItems (geometry_msgs::Point &goal_location)
   g_box_orientation.z = g_box_orientation_z;
   g_box_orientation.w = g_box_orientation_w;
 
-  redPurpleCluster (g_red_purple_cube_cloud);
+
 
   g_cube_dimensions.x = g_cube_dimensions_x;
   g_cube_dimensions.y = g_cube_dimensions_y;
@@ -1561,6 +1530,11 @@ CW3::findCubeAngle (double x, double y, double z)
 {
 
   g_stack_rotation = acos(x/sqrt(pow(x,2) + pow(y,2) + pow(z,2)));
+
+
+  g_stack_rotation = std::fmod(g_stack_rotation,cube_angle);  
+
+  std::cout << "Cube Angle: " << g_stack_rotation << std::endl;
 
   return;
 }
@@ -1615,7 +1589,4 @@ CW3::colourOfCloud (double r, double g, double b)
     g_required_colour = "pink";
     g_hue = g_hue_pink;
   } 
-
-  return;
-
 }

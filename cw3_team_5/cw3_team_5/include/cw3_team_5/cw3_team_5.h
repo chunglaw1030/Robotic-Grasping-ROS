@@ -59,6 +59,10 @@
 #include <tf2/convert.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include<cmath>
+#include <chrono>
+#include <thread>
+#include <map>
+#include <bits/stdc++.h>
 // PCL specific includes
 #include <pcl_conversions/pcl_conversions.h>
 //#include <pcl_ros/point_cloud.h>
@@ -213,12 +217,6 @@ class CW3
     void
     colourFilter(const sensor_msgs::PointCloud2ConstPtr& cloud_input_msg);
 
-    /** \brief Filter to extract the purple and red cubes 
-    * 
-    * \input[in] input pointcloud
-    */
-    void
-    filterPurpleRedCubes(PointCPtr & in_cloud_ptr);
 
     /** \brief MoveIt function for adding a cuboid collision object in RViz
       * and the MoveIt planning scene.
@@ -320,15 +318,7 @@ class CW3
     // enforceIntensitySimilarity (const PointT& point_a, 
     //   const PointT& point_b, float squared_distance );
 
-    /** \brief Perform Euclidean Clustering to find clusters of 
-    * red and purple cubes
-    * 
-    *  \input[in] in_cloud_ptr the input PointCloud2 pointer
-    *  
-    */
-    void
-    redPurpleCluster (PointCPtr &in_cloud_ptr);
-
+ 
     /** \brief Add golf tiles, basket (and red and purple cubes in task 3)
     * as collision items  
     * 
@@ -337,12 +327,6 @@ class CW3
     void 
     addCollisionItems (geometry_msgs::Point &goal_location);
     
-    /** \brief CropHull filter to filter parts of point clouds  
-    * 
-    *  \input[in] in_cloud_ptr the input PointCloud2 pointer
-    */
-    void
-    applyCropHull (PointCPtr &in_cloud_ptr);
 
     void
     findCubeAngle (double x, double y, double z);
@@ -476,7 +460,7 @@ class CW3
       g_cloud_crop_hull, g_red_purple_cube_cloud;
 
     /** \brief Quaternion to define box and grasp orientation */
-    tf2::Quaternion q_x180deg, q_object, q_object2, q_result, q_result2;
+    tf2::Quaternion q_x180deg, q_object2, q_result, q_result2;
     
     geometry_msgs::Quaternion g_box_orientation, grasp_orientation;
 
@@ -535,12 +519,13 @@ class CW3
     double gripper_closed_ = 0.0;
 
     /** \brief Parameters to define the pick and place operation */
-    double g_pick_offset_;
+    double g_pick_offset_ = 0.095;
     double pick_offset_task1 = 0.125; //0.125
     double pick_offset_task3 = 0.095; //0.125
     double angle_offset_ = 3.14159 / 4.0;
     double angle_offset1_ = 0;
     double angle_offset2_ = 3.14159 / 8.0;
+
     // double angle_offset3_ = 0.288;
     double approach_distance_ = 0.18;
     double g_drop_distance_ = 0.14;
@@ -554,6 +539,7 @@ class CW3
     double g_scan_pose_x2 = -0.1;
     double g_scan_pose_y = 0;
     double g_scan_pose_z = 0.7;
+    // double g_scan_pose_z = 0.8;
 
     double g_task1_pose1_x = 0.38;
     double g_task1_pose1_y = -0.09;
@@ -565,8 +551,8 @@ class CW3
     double g_task3_pose1_z = 0.85;
     double g_task3_pose2_x = -0.3;
 
-    float g_stack_rotation;
-
+    double g_stack_rotation;
+    double cube_angle = 3.14159 / 2.0;
     // std_msgs::Float32 g_stack_rotation_q1;
 
     float g_stack_rotation_q2;
@@ -625,9 +611,9 @@ class CW3
     double g_hue_red = 0.97;
     double g_hue_orange = 21.2;
     double g_hue_yellow = 42.3;
-    double g_hue_pink = -21.2;
+    double g_hue_pink = -9.17;
 
-    double g_rbg_tolerance = 5;
+    double g_rbg_tolerance = 10;
     double g_hue_tolerance = 10;
 
     double g_tile_r = 0;
@@ -637,8 +623,8 @@ class CW3
 
     /** \brief Parameters to define voxel grid and pass through filters */
     double g_vg_leaf_sz = 0.01; // VoxelGrid leaf size 0.01
-    double g_pt_thrs_min = -0.2; // PassThrough min thres
-    double g_pt_thrs_max = 2.0; // PassThrough max thres
+    double g_pt_thrs_min = -0.05; // PassThrough min thres -0.2
+    double g_pt_thrs_max = 4.0; // PassThrough max thres 2.0
     double g_k_nn = 50; // Normals nn size
     double seg_max_it = 150;
     double seg_dist_thres = 0.08;
@@ -675,7 +661,7 @@ class CW3
     /** \brief Parameters to define Euclidean Clustering */
     double g_cluster_tolerance = 0.01; //0.02
     double min_cluster_size = 2;
-    double max_cluster_size = 50;
+    double max_cluster_size = 20;
 
     /** \brief Parameters to Crop Hull filter */
     double concave_hull_alpha = 20;
