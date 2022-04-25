@@ -184,6 +184,12 @@ class CW3
     bool
     moveScanPosition(bool scan_front);
 
+    bool
+    moveScanPositionT3a(void);
+
+    bool
+    moveScanPositionT3b(void);
+
     /** \brief MoveIt function to perform a cartesian movement when picking cubes.
       *
       * \input[in] target pose to move the arm to
@@ -381,7 +387,7 @@ class CW3
 
     ros::Publisher g_pub_purple_red;
 
-    ros::Publisher g_pub_crop_hull;
+    ros::Publisher g_pub_crop_hull, g_pub_crop_stack;
 
     ros::Publisher g_pub_norm;
 
@@ -401,7 +407,7 @@ class CW3
     PointCPtr g_cloud_filtered_out_floor, g_cloud_floor;
     
     /** \brief Point Cloud (filtered) pointer. */
-    PointCPtr g_cloud_filtered_colour;
+    PointCPtr g_cloud_filtered_colour, g_cloud_filtered_stack;
 
     /** \brief Point Cloud (filtered) sensros_msg for publ. */
     sensor_msgs::PointCloud2 g_cloud_filtered_msg, g_cloud_normal_msg;
@@ -479,7 +485,7 @@ class CW3
     /** \brief Point and dimensions defined for collision items. */
     geometry_msgs::Point g_floor_centre, g_cube_centre, g_box_centre, g_box_location;
 
-    geometry_msgs::Point g_stack_point_q2;
+    geometry_msgs::Point g_stack_point_q2, g_stack_point_q3;
     
     geometry_msgs::Vector3 g_floor_dimensions, g_cube_dimensions, g_box_dimensions;
 
@@ -516,7 +522,7 @@ class CW3
     std::vector<moveit_msgs::CollisionObject> g_object_vector;
 
     /** \brief define robot poses for task 2 and 3 */
-    geometry_msgs::Pose g_scan_pose ;
+    
     geometry_msgs::Pose g_task2_pose ;
     geometry_msgs::Pose g_task3_pose1 ;
     geometry_msgs::Pose g_task3_pose2 ;
@@ -539,6 +545,8 @@ class CW3
     double angle_offset_ = 3.14159 / 4.0;
     double angle_offset1_ = 0;
     double angle_offset2_ = 3.14159 / 8.0;
+    double angle_offset_scan_ = 3.14159 / 10.0;
+    double angle_offset_scan2_ = 3.14159 / 18.0;; //3.14159 / 18.0;
 
     // double angle_offset3_ = 0.288;
     double approach_distance_ = 0.18;
@@ -549,10 +557,11 @@ class CW3
     double box_centre_offset = 0.1;
 
     double g_task1_angle;
-    double g_scan_pose_x = 0.1;
-    double g_scan_pose_x2 = -0.1;
-    double g_scan_pose_y = 0;
+    double g_scan_pose_x = 0.35;
+    double g_scan_pose_y = -0.45;
     double g_scan_pose_z = 0.7;
+
+
     // double g_scan_pose_z = 0.8;
 
     double g_task1_pose1_x = 0.38;
@@ -560,10 +569,10 @@ class CW3
     double g_task1_pose1_z = 0.2;
 
 
-    double g_task3_pose1_x = 0.3;
+    double g_task3_pose1_x = 0.2;
     double g_task3_pose1_y = 0;
-    double g_task3_pose1_z = 0.85;
-    double g_task3_pose2_x = -0.3;
+    double g_task3_pose1_z = 0.7;
+    double g_task3_pose2_x = -0.2;
 
     const double stack_point_z = 0;
     double g_stack_rotation;
@@ -636,6 +645,7 @@ class CW3
 
     const double g_rbg_tolerance = 10;
     const double g_hsi_tolerance = 20;
+    const double g_xyz_tolerance = 0.03;
 
     double g_tile_r = 0;
     double g_tile_g = 60;

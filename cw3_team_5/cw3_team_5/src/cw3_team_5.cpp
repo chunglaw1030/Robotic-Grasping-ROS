@@ -47,6 +47,7 @@ CW3::CW3(ros::NodeHandle &nh):
   g_cloud_floor (new PointC),
   g_cloud_filtered_out_floor (new PointC),
   g_cloud_filtered_colour (new PointC),
+  g_cloud_filtered_stack (new PointC),
   g_cloud_plane (new PointC), // plane point cloud
   g_tree_ptr (new pcl::search::KdTree<PointT> ()), // KdTree
   g_tree_cluster_ptr (new pcl::search::KdTree<PointT>), // Euclidean Cluster KdTree
@@ -94,6 +95,7 @@ CW3::CW3(ros::NodeHandle &nh):
   g_pub_cloud_filtered2 = nh.advertise<sensor_msgs::PointCloud2> ("cloud_filtered2", 5, true);
   // g_pub_purple_red = nh.advertise<sensor_msgs::PointCloud2> ("purple_red_cubes", 1, true);
   // g_pub_crop_hull = nh.advertise<sensor_msgs::PointCloud2> ("crop_hull", 1, true);
+  g_pub_crop_stack = nh.advertise<sensor_msgs::PointCloud2> ("cropped_stack", 5, true);
   g_pub_point = nh.advertise<geometry_msgs::PointStamped> ("centroid", 5, true);
   g_pub_normal_point = nh.advertise<geometry_msgs::PointStamped> ("normal_point1", 5, true);
   g_pub_colour_filtered = nh.advertise<sensor_msgs::PointCloud2> ("Colour_filtered", 5, true);
@@ -178,203 +180,6 @@ CW3::task1Callback(cw3_world_spawner::Task1Service::Request &request,
   //////////////// Using Color filter ///////////////////////////
 
 
-  // std::multimap< double, std::string, std::less<double> > mmapOfColour;
-
-  // //// start with blue
-  // g_r.data = g_blue_r_value;
-  // g_g.data = g_blue_g_value;
-  // g_b.data = g_blue_b_value;
-  // colourOfCloud(g_r.data, g_g.data, g_b.data);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // euclideanCluster (g_cloud_filtered_colour);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // if (! g_centroid_list.empty())
-  // { 
-  //   for (auto i: g_centroid_list)
-  //   {
-  //     double z_value;
-  //     z_value = i.point.z;
-  //     // z_value = i.pose.position.z;
-  //     // mmapOfColour.insert(std::pair<std::string, double>("blue", z_value));
-  //     mmapOfColour.insert(std::pair<double, std::string>(z_value, g_required_colour));
-  //   }
-  //   // euclideanCluster (g_cloud_filtered_rgb);
-  //   // ros::Duration(0.2).sleep();
-  // }
-
-  // g_r.data = g_purple_r_value;
-  // g_g.data = g_purple_g_value;
-  // g_b.data = g_purple_b_value;
-  // colourOfCloud(g_r.data, g_g.data, g_b.data);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // euclideanCluster (g_cloud_filtered_colour);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // if (! g_centroid_list.empty())
-  // { 
-  //   for (auto i: g_centroid_list)
-  //   {
-  //     double z_value;
-  //     z_value = i.point.z;
-  //     // z_value = i.pose.position.z;
-  //     mmapOfColour.insert(std::pair<double, std::string>(z_value, g_required_colour));
-  //     // mmapOfColour.insert(std::pair<std::string, double>("purple", z_value));
-  //     // mmapOfColour.insert(std::pair<double, std::string>(z_value, "purple"));
-  //     // mmapOfColour.insert(std::pair<double, std::string, double,
-  //     //   double, double>(z_value, g_required_colour, g_r.data/g_rgb_convert,
-  //     //     g_g.data/g_rgb_convert, g_b.data/g_rgb_convert ));
-  //   }
-  //   // euclideanCluster (g_cloud_filtered_rgb);
-  //   // ros::Duration(0.2).sleep();
-  // }
-
-  // g_r.data = g_red_r_value;
-  // g_g.data = g_red_g_value;
-  // g_b.data = g_red_b_value;
-  // colourOfCloud(g_r.data, g_g.data, g_b.data);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // euclideanCluster (g_cloud_filtered_colour);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // if (! g_centroid_list.empty())
-  // { 
-  //   for (auto i: g_centroid_list)
-  //   {
-  //     double z_value;
-  //     z_value = i.point.z;
-  //     // z_value = i.pose.position.z;
-  //     // mmapOfColour.insert(std::pair<std::string, double>("red", z_value));
-  //     // mmapOfColour.insert(std::pair<double, std::string>(z_value, "red"));
-  //     mmapOfColour.insert(std::pair<double, std::string>(z_value, g_required_colour));
-  //   }
-  //   // euclideanCluster (g_cloud_filtered_rgb);
-  //   // ros::Duration(0.2).sleep();
-  // }
-
-  // g_r.data = g_orange_r_value;
-  // g_g.data = g_orange_g_value;
-  // g_b.data = g_orange_b_value;
-  // colourOfCloud(g_r.data, g_g.data, g_b.data);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // euclideanCluster (g_cloud_filtered_colour);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-
-  // if (! g_centroid_list.empty())
-  // { 
-  //   for (auto i: g_centroid_list)
-  //   {
-  //     double z_value;
-  //     z_value = i.point.z;
-  //     // z_value = i.pose.position.z;
-  //     // mmapOfColour.insert(std::pair<std::string, double>("orange", z_value));
-  //     // mmapOfColour.insert(std::pair<double, std::string>(z_value, "orange"));
-  //     mmapOfColour.insert(std::pair<double, std::string>(z_value, g_required_colour));
-  //   }
-  //   // euclideanCluster (g_cloud_filtered_rgb);
-  //   // ros::Duration(0.2).sleep();
-  // }
-
-  // g_r.data = g_yellow_r_value;
-  // g_g.data = g_yellow_g_value;
-  // g_b.data = g_yellow_b_value;
-  // colourOfCloud(g_r.data, g_g.data, g_b.data);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // euclideanCluster (g_cloud_filtered_colour);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-
-  // if (! g_centroid_list.empty())
-  // { 
-  //   for (auto i: g_centroid_list)
-  //   {
-  //     double z_value;
-  //     z_value = i.point.z;
-  //     // z_value = i.pose.position.z;
-  //     // mmapOfColour.insert(std::pair<std::string, double>("yellow", z_value));
-  //     // mmapOfColour.insert(std::pair<double, std::string>(z_value, "yellow"));
-  //     mmapOfColour.insert(std::pair<double, std::string>(z_value, g_required_colour));
-  //   }
-  //   // euclideanCluster (g_cloud_filtered_rgb);
-  //   // ros::Duration(0.2).sleep();
-  // }
-
-  // g_r.data = g_pink_r_value;
-  // g_g.data = g_pink_g_value;
-  // g_b.data = g_pink_b_value;
-  // colourOfCloud(g_r.data, g_g.data, g_b.data);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-  // euclideanCluster (g_cloud_filtered_colour);
-  // std::this_thread::sleep_for(std::chrono::seconds(3));
-
-  // if (! g_centroid_list.empty())
-  // { 
-  //   for (auto i: g_centroid_list)
-  //   {
-  //     double z_value;
-  //     z_value = i.point.z;
-  //     // z_value = i.pose.position.z;
-  //     // mmapOfColour.insert(std::pair<std::string, double>("pink", z_value));
-  //     // mmapOfColour.insert(std::pair<double, std::string>(z_value, "pink"));
-  //     mmapOfColour.insert(std::pair<double, std::string>(z_value, g_required_colour));
-  //   }
-  //   // euclideanCluster (g_cloud_filtered_rgb);
-  //   // ros::Duration(0.2).sleep();
-  // }
-
-  // // for (std::multimap<std::string, double>::iterator it = mmapOfColour.begin();
-  // for (std::multimap<double, std::string>::iterator it = mmapOfColour.begin();
-  //         it != mmapOfColour.end(); it++)
-  // {
-  //   std::cout << it->first << " :: " << it->second << std::endl;
-
-  //   std_msgs::ColorRGBA colour_of_cubes;
-  //   if (it->second == "blue")
-  //   {
-  //     colour_of_cubes.r = g_blue_r_value/g_rgb_convert;
-  //     colour_of_cubes.g = g_blue_g_value/g_rgb_convert;
-  //     colour_of_cubes.b = g_blue_b_value/g_rgb_convert;
-  //     response.stack_colours.push_back(colour_of_cubes);
-  //   }
-
-  //   else if (it->second == "purple")
-  //   {
-  //     colour_of_cubes.r = g_purple_r_value/g_rgb_convert;
-  //     colour_of_cubes.g = g_purple_g_value/g_rgb_convert;
-  //     colour_of_cubes.b = g_purple_b_value/g_rgb_convert;
-  //     response.stack_colours.push_back(colour_of_cubes);
-  //   }
-
-  //   else if (it->second == "red")
-  //   {
-  //     colour_of_cubes.r = g_red_r_value/g_rgb_convert;
-  //     colour_of_cubes.g = g_red_g_value/g_rgb_convert;
-  //     colour_of_cubes.b = g_red_b_value/g_rgb_convert;
-  //     response.stack_colours.push_back(colour_of_cubes);
-  //   }
-
-  //   else if (it->second == "orange")
-  //   {
-  //     colour_of_cubes.r = g_orange_r_value/g_rgb_convert;
-  //     colour_of_cubes.g = g_orange_g_value/g_rgb_convert;
-  //     colour_of_cubes.b = g_orange_b_value/g_rgb_convert;
-  //     response.stack_colours.push_back(colour_of_cubes);
-  //   }
-    
-  //   else if (it->second == "yellow")
-  //   {
-  //     colour_of_cubes.r = g_yellow_r_value/g_rgb_convert;
-  //     colour_of_cubes.g = g_yellow_g_value/g_rgb_convert;
-  //     colour_of_cubes.b = g_yellow_b_value/g_rgb_convert;
-  //     response.stack_colours.push_back(colour_of_cubes);
-  //   }
-
-  //   else if (it->second == "pink")
-  //   {
-  //     colour_of_cubes.r = g_pink_r_value/g_rgb_convert;
-  //     colour_of_cubes.g = g_pink_g_value/g_rgb_convert;
-  //     colour_of_cubes.b = g_pink_b_value/g_rgb_convert;
-  //     response.stack_colours.push_back(colour_of_cubes);
-  //   }
-  // }
-
-   // for (std::multimap<std::string, double>::iterator it = mmapOfColour.begin();
   std::multimap< double, std::string, std::less<double> > mmapOfColour;
 
   mmapOfColour = findColourInStack();
@@ -516,8 +321,9 @@ CW3::task3Callback(cw3_world_spawner::Task3Service::Request &request,
 
   moveHomePosition(g_home_postion);
   
-  bool scan_front = true;
-  moveScanPosition(scan_front);
+  // bool scan_front = true;
+  // moveScanPosition(scan_front);
+  moveScanPositionT3a();
 
   std::this_thread::sleep_for(std::chrono::seconds(3));
 
@@ -654,6 +460,139 @@ CW3::task3Callback(cw3_world_spawner::Task3Service::Request &request,
     }
   }
 
+  // bool scan_front2 = false;
+  // moveScanPosition(scan_front2);
+  moveScanPositionT3b();
+
+  //// start with blue
+  g_r.data = g_blue_r_value;
+  g_g.data = g_blue_g_value;
+  g_b.data = g_blue_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  if (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      if (z_value > tallest_point.z)
+      {
+        tallest_point = i.point;
+      }
+    }
+  }
+
+  g_r.data = g_purple_r_value;
+  g_g.data = g_purple_g_value;
+  g_b.data = g_purple_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  if (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      if (z_value > tallest_point.z)
+      {
+        tallest_point = i.point;
+      }
+    }
+  }
+
+  g_r.data = g_red_r_value;
+  g_g.data = g_red_g_value;
+  g_b.data = g_red_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  if (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      if (z_value > tallest_point.z)
+      {
+        tallest_point = i.point;
+      }
+    }
+  }
+
+  g_r.data = g_orange_r_value;
+  g_g.data = g_orange_g_value;
+  g_b.data = g_orange_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  if (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      if (z_value > tallest_point.z)
+      {
+        tallest_point = i.point;
+      }
+    }
+  }
+
+  g_r.data = g_yellow_r_value;
+  g_g.data = g_yellow_g_value;
+  g_b.data = g_yellow_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  if (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      if (z_value > tallest_point.z)
+      {
+        tallest_point = i.point;
+      }
+    }
+  }
+
+  g_r.data = g_pink_r_value;
+  g_g.data = g_pink_g_value;
+  g_b.data = g_pink_b_value;
+  colourOfCloud(g_r.data, g_g.data, g_b.data);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+  euclideanCluster (g_cloud_filtered_colour);
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  if (! g_centroid_list.empty())
+  { 
+    for (auto i: g_centroid_list)
+    {
+      double z_value;
+      z_value = i.point.z;
+      if (z_value > tallest_point.z)
+      {
+        tallest_point = i.point;
+      }
+    }
+  }
+
+  g_stack_point_q3 = tallest_point;
+
 
 
   return free;
@@ -697,24 +636,71 @@ CW3::moveScanPosition(bool scan_front)
   // q_object.setRPY(3.14159 / 18.0, 3.14159 / 18.0, angle_offset_);
   tf2::Quaternion q_object;
   // q_object.setRPY(angle_offset2_, angle_offset2_, angle_offset_);
-  q_object.setRPY(3.14159 / 10.0, -3.14159 / 10.0, angle_offset_);
+  q_object.setRPY(angle_offset_scan_, -angle_offset_scan_, angle_offset_);
   q_result = q_x180deg * q_object;
   geometry_msgs::Quaternion scan_orientation;
   scan_orientation = tf2::toMsg(q_result);
   
+  geometry_msgs::Pose scan_pose ;
+
   if (scan_front == true)
-    // g_scan_pose.position.x = g_scan_pose_x;
-    g_scan_pose.position.x = 0.35;
+    scan_pose.position.x = g_scan_pose_x;
   else if (scan_front == false)
-    // g_scan_pose.position.x = g_scan_pose_x2;
-    g_scan_pose.position.x = g_scan_pose_x2;
+    scan_pose.position.x = - g_scan_pose_x;
 
-  // g_scan_pose.position.y = g_scan_pose_y;
-  g_scan_pose.position.y = -0.45;
-  g_scan_pose.position.z = g_scan_pose_z;
-  g_scan_pose.orientation = scan_orientation;
+  scan_pose.position.y = g_scan_pose_y;
+  scan_pose.position.z = g_scan_pose_z;
+  scan_pose.orientation = scan_orientation;
 
-  moveArm(g_scan_pose);
+  moveArm(scan_pose);
+
+  return true;
+}
+
+bool
+CW3::moveScanPositionT3a(void)
+{
+  /* This function moves the move_group to the scan position */
+
+  q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
+
+  tf2::Quaternion q_object;
+  geometry_msgs::Quaternion task3_pose1_orientation;
+  q_object.setRPY(angle_offset_scan2_, angle_offset_scan2_, angle_offset_);
+  q_result = q_x180deg * q_object;
+  task3_pose1_orientation = tf2::toMsg(q_result);
+
+  geometry_msgs::Pose task3_pose1 ;
+  task3_pose1.position.x = g_task3_pose1_x;
+  task3_pose1.position.y = g_task3_pose1_y;
+  task3_pose1.position.z = g_task3_pose1_z;
+  task3_pose1.orientation = task3_pose1_orientation;
+
+  moveArm(task3_pose1);
+
+  return true;
+}
+
+bool
+CW3::moveScanPositionT3b(void)
+{
+  /* This function moves the move_group to the scan position */
+
+  q_x180deg =  tf2::Quaternion(q_x180deg_x, q_x180deg_y, q_x180deg_z, q_x180deg_w);
+
+  tf2::Quaternion q_object;
+  geometry_msgs::Quaternion task3_pose2_orientation;
+  q_object.setRPY(angle_offset_scan2_, angle_offset_scan2_, angle_offset_);
+  q_result = q_x180deg * q_object;
+  task3_pose2_orientation = tf2::toMsg(q_result);
+
+  geometry_msgs::Pose task3_pose2 ;
+  task3_pose2.position.x = g_task3_pose2_x;
+  task3_pose2.position.y = g_task3_pose1_y;
+  task3_pose2.position.z = g_task3_pose1_z;
+  task3_pose2.orientation = task3_pose2_orientation;
+
+  moveArm(task3_pose2);
 
   return true;
 }
@@ -1081,6 +1067,10 @@ CW3::colourFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_input_msg)
   
   pubFilteredPCMsg (g_pub_colour_filtered, *g_cloud_filtered_colour);
 
+  removeFloor(g_rgb_cloud, g_cloud_filtered_stack);
+
+  pubFilteredPCMsg (g_pub_crop_stack, *g_cloud_filtered_stack);
+
   return;
 }
 
@@ -1216,16 +1206,9 @@ CW3::removeFloor (PointCPtr &in_cloud_ptr,
   
   geometry_msgs::PointStamped world;
 
-  double floor_x = 0;
-  double floor_y = 0;
-  double floor_z = 0.032;
-
-
   world.header.frame_id = g_input_pc_frame_id_;
   world.header.stamp = ros::Time (0);
-  world.point.x = floor_x;
-  world.point.y = floor_y;
-  world.point.z = floor_z;
+  world.point = g_stack_point_q3;
 
   geometry_msgs::PointStamped cam;
 
@@ -1241,14 +1224,31 @@ CW3::removeFloor (PointCPtr &in_cloud_ptr,
     ROS_ERROR ("Received a trasnformation exception: %s", ex.what());
   }
 
-  floor_z = cam.point.z;
+  double floor_x = cam.point.x;
+  double floor_y = cam.point.y;
+  double floor_z = cam.point.z;
 
   pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
 
   
+  pcl::FieldComparison<PointT>::ConstPtr floor_x_lb (
+        new pcl::FieldComparison<PointT> ("x", pcl::ComparisonOps::GE, floor_x-g_xyz_tolerance));
+  pcl::FieldComparison<PointT>::ConstPtr floor_x_ub (
+        new pcl::FieldComparison<PointT> ("x", pcl::ComparisonOps::LE, floor_x+g_xyz_tolerance));
+  pcl::FieldComparison<PointT>::ConstPtr floor_y_lb (
+        new pcl::FieldComparison<PointT> ("y", pcl::ComparisonOps::GE, floor_y-g_xyz_tolerance));
+  pcl::FieldComparison<PointT>::ConstPtr floor_y_ub (
+        new pcl::FieldComparison<PointT> ("y", pcl::ComparisonOps::LE, floor_y+g_xyz_tolerance));
+  pcl::FieldComparison<PointT>::ConstPtr floor_z_lb (
+        new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::GE, floor_z-g_xyz_tolerance));
   pcl::FieldComparison<PointT>::ConstPtr floor_z_ub (
-        new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LE, floor_z));
+        new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LE, floor_z+g_xyz_tolerance));
 
+  range_cond->addComparison(floor_x_lb);
+  range_cond->addComparison(floor_x_ub);
+  range_cond->addComparison(floor_y_lb);
+  range_cond->addComparison(floor_y_ub);
+  range_cond->addComparison(floor_z_lb);
   range_cond->addComparison(floor_z_ub);
 
   floor_remove.setCondition(range_cond);
@@ -1258,6 +1258,7 @@ CW3::removeFloor (PointCPtr &in_cloud_ptr,
   return;
 
 }
+
 void
 CW3::segPlane (PointCPtr &in_cloud_ptr)
 {
