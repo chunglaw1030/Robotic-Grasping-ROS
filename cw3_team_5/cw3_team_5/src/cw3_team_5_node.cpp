@@ -15,13 +15,13 @@ int main(int argc, char** argv)
   
   ros::Subscriber sub_rgb =
   nh.subscribe ("/r200/camera/depth_registered/points",
-                1,
+                5,
                 &CW3::colourFilter,
                 &CW3_object);
 
 
   // loop rate in Hz
-  ros::Rate rate(10);
+  ros::Rate rate(30);
 
   while (ros::ok()) {
 

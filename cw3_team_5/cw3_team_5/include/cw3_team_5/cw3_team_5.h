@@ -230,6 +230,11 @@ class CW3
     addCollisionObject(std::string object_name, geometry_msgs::Point centre, 
     geometry_msgs::Vector3 dimensions, geometry_msgs::Quaternion orientation);
 
+    void
+    removeCollisionObject(std::string object_name, geometry_msgs::Point centre, 
+    geometry_msgs::Vector3 dimensions, geometry_msgs::Quaternion orientation);
+
+
     /** \brief Apply Voxel Grid filtering.
       * 
       * \input[in] in_cloud_ptr the input PointCloud2 pointer
@@ -293,7 +298,10 @@ class CW3
       *  
       */
     void
-    publishPose (geometry_msgs::PointStamped &cube_pt_msg);
+    publishPoint (geometry_msgs::PointStamped &cube_pt_msg);
+
+    void
+    publishPose (geometry_msgs::PoseStamped &cube_pt_msg);
 
     /** \brief Publish the filtered point cloud.
     * 
@@ -333,6 +341,10 @@ class CW3
 
     void
     colourOfCloud (double r, double g, double b);
+
+    std::multimap< double, std::string, std::less<double> >
+    findColourInStack (void);
+
 
     /** \brief MoveIt interface to move groups to seperate the arm and the gripper,
       * these are defined in urdf. */
@@ -489,7 +501,9 @@ class CW3
     std_msgs::Float32 g_b;
 
     /** \brief Centroid list for task 2 and 3 */
-    std::list<geometry_msgs::PointStamped> g_centroid_list, g_cec_centroid_list;
+    std::list<geometry_msgs::PointStamped> g_centroid_list;
+
+    std::list<double> g_angle_list;
 
     /** \brief Centroid list of red and purple cubes */
     std::list<geometry_msgs::PointStamped> g_centroid_list2;
@@ -519,7 +533,7 @@ class CW3
     double gripper_closed_ = 0.0;
 
     /** \brief Parameters to define the pick and place operation */
-    double g_pick_offset_ = 0.095;
+    double g_pick_offset_ = 0.095; //0.095
     double pick_offset_task1 = 0.125; //0.125
     double pick_offset_task3 = 0.095; //0.125
     double angle_offset_ = 3.14159 / 4.0;
@@ -528,7 +542,7 @@ class CW3
 
     // double angle_offset3_ = 0.288;
     double approach_distance_ = 0.18;
-    double g_drop_distance_ = 0.14;
+    double g_drop_distance_ = 0.16;
     double approach_box_ = 0.15;    // pcl::PackedRGBComparison<PointT>::Ptr
 
     double home_pose_ = 0;
@@ -551,9 +565,12 @@ class CW3
     double g_task3_pose1_z = 0.85;
     double g_task3_pose2_x = -0.3;
 
+    const double stack_point_z = 0;
     double g_stack_rotation;
     double cube_angle = 3.14159 / 2.0;
     // std_msgs::Float32 g_stack_rotation_q1;
+
+    const double tallest_point_init = 0;
 
     float g_stack_rotation_q2;
 
@@ -567,14 +584,7 @@ class CW3
     //           'orange': [0.9, 0.4, 0.1],
     //           'pink':   [0.9, 0.7, 0.7]}
 
-    // std::map<std::string, std::vector<double>> BOX_COLORS = 
-    //                                     { {'purple', {0.8, 0.1, 0.8}},
-    //                                       {'red',    {0.8, 0.1, 0.1}},
-    //                                       {'blue',   {0.1, 0.1, 0.8}},
-    //                                       {'yellow', {1.0, 1.0, 0.0}},
-    //                                       {'orange', {0.9, 0.4, 0.1}},
-    //                                       {'pink',   {0.9, 0.7, 0.7}} };
-
+ 
     double g_rgb_convert = 100;
 
     double g_blue_r_value = 10;
@@ -601,20 +611,31 @@ class CW3
     double g_pink_g_value = 70;
     double g_pink_b_value = 70;
 
-
-    double g_red_purple_cube_r = 80;
-    double g_red_purple_cube_g = 10;
-    double g_hue;
+    double g_hue, g_sat, g_int;
 
     double g_hue_blue = -84.7;
     double g_hue_purple = -42.3;
     double g_hue_red = 0.97;
     double g_hue_orange = 21.2;
     double g_hue_yellow = 42.3;
-    double g_hue_pink = -9.17;
+    double g_hue_pink = 0; //-9.17
 
-    double g_rbg_tolerance = 10;
-    double g_hue_tolerance = 10;
+    double g_sat_blue = 168.3;
+    double g_sat_purple = 204;
+    double g_sat_red = 168;
+    double g_sat_orange = 191;
+    double g_sat_yellow = 247;
+    double g_sat_pink = 21.6; 
+    
+    double g_int_blue = 35;
+    double g_int_purple = 58;
+    double g_int_red = 35;
+    double g_int_orange = 48;
+    double g_int_yellow = 67;
+    double g_int_pink = 77; 
+
+    const double g_rbg_tolerance = 10;
+    const double g_hsi_tolerance = 20;
 
     double g_tile_r = 0;
     double g_tile_g = 60;
@@ -659,7 +680,7 @@ class CW3
     double g_floor_centre_z = 0;
 
     /** \brief Parameters to define Euclidean Clustering */
-    double g_cluster_tolerance = 0.01; //0.02
+    double g_cluster_tolerance = 0.035; //0.01 or 0.02
     double min_cluster_size = 2;
     double max_cluster_size = 20;
 
