@@ -6,7 +6,7 @@ Time spent: too long, equal contribution time
 
 To run: 
 1) Please enable octomap in moveit_panda_config/sensors_kinect_depthmap.yaml and sensors_kinect_pointcloud.yaml
-2) Set <param name="octomap_resolution" type="double" value="0.025"/> in "sensor_manager.launch.xml"
+2) Set <!-- <param name="octomap_resolution" type="double" value="0.025"/> --> in "sensor_manager.launch.xml"
 2) catkin build + source devel/setup.bash
 3) roslaunch cw1_team_5 run_solution.launch
 4) open another terminal and run rosservice call /task 1 or task 2 or task 3
