@@ -21,7 +21,7 @@ int main(int argc, char** argv)
 
 
   // loop rate in Hz
-  ros::Rate rate(30);
+  ros::Rate rate(50);
 
   while (ros::ok()) {
 

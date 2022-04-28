@@ -179,7 +179,7 @@ class CW3
       * \return true if moved to target position 
       */
     bool
-    moveHomePosition(const std::vector< double > &group_variable_values);
+    moveJointPosition(const std::vector< double > &group_variable_values);
 
     bool
     moveScanPosition(bool scan_front);
@@ -189,6 +189,9 @@ class CW3
 
     bool
     moveScanPositionT3b(void);
+
+    bool
+    moveScanPositionQ3(int pose);
 
     /** \brief MoveIt function to perform a cartesian movement when picking cubes.
       *
@@ -267,6 +270,10 @@ class CW3
     void
     findNormals (PointCPtr &in_cloud_ptr);
 
+    void
+    RGBFilter (PointCPtr &in_cloud_ptr,
+                PointCPtr &out_cloud_ptr);
+
     /** \brief Segment plane for cube tasks.
       * 
       * \input[in] in_cloud_ptr the input PointCloud2 pointer
@@ -279,8 +286,13 @@ class CW3
                   PointCPtr &out_cloud_ptr);
 
     void
-    removeFloor (PointCPtr &in_cloud_ptr,
+    removeStack (PointCPtr &in_cloud_ptr,
                   PointCPtr &out_cloud_ptr);
+
+    void
+    showStack (PointCPtr &in_cloud_ptr,
+                  PointCPtr &out_cloud_ptr);
+
 
     /** \brief Point Cloud publisher.
       * 
@@ -351,6 +363,11 @@ class CW3
     std::multimap< double, std::string, std::less<double> >
     findColourInStack (void);
 
+    std::multimap< double, std::string, std::less<double> >
+    findColourInStackQ3 (void);
+
+    void
+    findTallestStack(void);
 
     /** \brief MoveIt interface to move groups to seperate the arm and the gripper,
       * these are defined in urdf. */
@@ -387,9 +404,9 @@ class CW3
 
     ros::Publisher g_pub_purple_red;
 
-    ros::Publisher g_pub_crop_hull, g_pub_crop_stack;
+    ros::Publisher g_pub_crop_hull, g_pub_crop_stack, g_pub_crop_stack_rgb;
 
-    ros::Publisher g_pub_norm;
+    ros::Publisher g_pub_norm, g_pub_crop_out_stack_rgb;
 
     /** \brief ROS geometry message point. */
     geometry_msgs::PointStamped g_rpc_pt_msg;
@@ -398,7 +415,7 @@ class CW3
     ros::Publisher g_pub_pose, g_pub_pose_test;
             
     /** \brief ROS pose publishers. */
-    ros::Publisher g_pub_point, g_pub_normal_point;
+    ros::Publisher g_pub_point, g_pub_stack_point;
 
     /** \brief Point Cloud (filtered) pointer. */
     PointCPtr g_cloud_filtered, g_cloud_filtered2;
@@ -408,6 +425,10 @@ class CW3
     
     /** \brief Point Cloud (filtered) pointer. */
     PointCPtr g_cloud_filtered_colour, g_cloud_filtered_stack;
+
+    PointCPtr g_cloud_filtered_stack_rgb, g_cloud_filtered_out_stack;
+
+    PointCPtr g_cloud_filtered_out_stack_rgb;
 
     /** \brief Point Cloud (filtered) sensros_msg for publ. */
     sensor_msgs::PointCloud2 g_cloud_filtered_msg, g_cloud_normal_msg;
@@ -478,14 +499,14 @@ class CW3
       g_cloud_crop_hull, g_red_purple_cube_cloud;
 
     /** \brief Quaternion to define box and grasp orientation */
-    tf2::Quaternion q_x180deg, q_object2, q_result, q_result2;
+    tf2::Quaternion q_x180deg; // q_result, q_result2;
     
     geometry_msgs::Quaternion g_box_orientation, grasp_orientation;
 
     /** \brief Point and dimensions defined for collision items. */
     geometry_msgs::Point g_floor_centre, g_cube_centre, g_box_centre, g_box_location;
 
-    geometry_msgs::Point g_stack_point_q2, g_stack_point_q3;
+    geometry_msgs::Point g_stack_point_q2, g_stack_point_q3, g_tallest_point, g_goal_stack_point_q3;
     
     geometry_msgs::Vector3 g_floor_dimensions, g_cube_dimensions, g_box_dimensions;
 
@@ -493,6 +514,8 @@ class CW3
       g_target_frame = "world", g_panda_link0 = "panda_link0";
     
     std::string base_frame_ = "panda_link0";
+
+    std::vector<double> g_joint_group_positions_q3;
 
     std::string g_required_colour ;
 
@@ -514,7 +537,7 @@ class CW3
     /** \brief Centroid list of red and purple cubes */
     std::list<geometry_msgs::PointStamped> g_centroid_list2;
 
-    std::vector<std_msgs::ColorRGBA> g_colour_list_q2;
+    std::vector<std_msgs::ColorRGBA> g_colour_list_q2, g_colour_list_q3;
 
     /** \brief collision objects  */
     moveit_msgs::CollisionObject g_collision_object;
@@ -548,6 +571,9 @@ class CW3
     double angle_offset_scan_ = 3.14159 / 10.0;
     double angle_offset_scan2_ = 3.14159 / 18.0;; //3.14159 / 18.0;
 
+    double joint_offset1_ = 3.14159 / 2;
+    double joint_offset2_ = 3.14159 ;
+
     // double angle_offset3_ = 0.288;
     double approach_distance_ = 0.18;
     double g_drop_distance_ = 0.16;
@@ -558,6 +584,7 @@ class CW3
 
     double g_task1_angle;
     double g_scan_pose_x = 0.35;
+    double g_scan_pose_x2 = -0.30;
     double g_scan_pose_y = -0.45;
     double g_scan_pose_z = 0.7;
 
@@ -569,10 +596,10 @@ class CW3
     double g_task1_pose1_z = 0.2;
 
 
-    double g_task3_pose1_x = 0.2;
+    double g_task3_pose1_x = 0.1;
     double g_task3_pose1_y = 0;
-    double g_task3_pose1_z = 0.7;
-    double g_task3_pose2_x = -0.2;
+    double g_task3_pose1_z = 0.85; 
+    double g_task3_pose2_x = -0.1;
 
     const double stack_point_z = 0;
     double g_stack_rotation;
@@ -645,7 +672,7 @@ class CW3
 
     const double g_rbg_tolerance = 10;
     const double g_hsi_tolerance = 20;
-    const double g_xyz_tolerance = 0.03;
+    const double g_xyz_tolerance = 0.06;
 
     double g_tile_r = 0;
     double g_tile_g = 60;
@@ -659,8 +686,10 @@ class CW3
     double g_k_nn = 50; // Normals nn size
     double seg_max_it = 150;
     double seg_dist_thres = 0.08;
+    double seg_dist_thres_floor = 0.03;
     double seg_dist_thres_plane = 0.005; //0.01
     double seg_dist_weight = 0.1;
+
 
     /** \brief Parameters to define cartesian move */
     const double g_jump_threshold = 0.0;
@@ -690,7 +719,7 @@ class CW3
     double g_floor_centre_z = 0;
 
     /** \brief Parameters to define Euclidean Clustering */
-    double g_cluster_tolerance = 0.035; //0.01 or 0.02
+    double g_cluster_tolerance = 0.030; //0.01 or 0.02 o r0.035
     double min_cluster_size = 2;
     double max_cluster_size = 20;
 
